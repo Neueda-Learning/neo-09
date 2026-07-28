@@ -122,10 +122,9 @@ public class ApplicationService {
     }
 
     private void bridgeToSupportCase(ApplicationRequest request) {
-        String correlationId = request.correlationId();
-        if (correlationId == null || correlationId.isBlank()) {
-            correlationId = "auto-" + request.applicationId();
-        }
+        // Keep the support-case idempotency key stable per application so different
+        // applications never collide when an upstream sender reuses correlation ids.
+        String correlationId = "app-" + request.applicationId();
 
         String channel = request.application() == null || request.application().channel() == null
                 ? "UNKNOWN"
