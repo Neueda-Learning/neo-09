@@ -1,6 +1,7 @@
 package com.neobank.module.controller;
 
 import com.neobank.module.support.service.InvalidOpenCaseException;
+import com.neobank.module.support.service.InvalidCaseConfigException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -31,6 +32,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidOpenCaseException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidOpenCase(
             InvalidOpenCaseException ex) {
+        return error(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidCaseConfigException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidCaseConfig(
+            InvalidCaseConfigException ex) {
         return error(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 

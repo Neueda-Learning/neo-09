@@ -11,6 +11,8 @@ public interface CaseConfigRepository extends JpaRepository<CaseConfig, Integer>
 
     Optional<CaseConfig> findTopByOrderByVersionDesc();
 
+    java.util.List<CaseConfig> findAllByOrderByVersionAsc();
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from CaseConfig c where c.version = (select max(c2.version) from CaseConfig c2)")
     Optional<CaseConfig> lockCurrent();
