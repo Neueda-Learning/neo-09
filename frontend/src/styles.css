@@ -28,3 +28,24 @@
   min-height: var(--ds-space-10);
   color: var(--ds-color-text-muted);
 }
+
+.config-editor-pane,
+.config-history-pane {
+  display: grid;
+  gap: var(--ds-space-4);
+}
+
+.config-editor-pane h3,
+.config-history-pane h3,
+.config-history-detail h4 {
+  margin: 0;
+}
+
+.config-history-detail {
+  display: grid;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3);
+  border: 1px solid var(--ds-color-border-muted);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-color-surface-elevated);
+}

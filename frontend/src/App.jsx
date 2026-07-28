@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppShell, Button, SideBrand, SideNav, StatusPill } from './design-system';
 import CaseBoardScreen from './components/CaseBoardScreen.jsx';
+import CaseConfigScreen from './components/CaseConfigScreen.jsx';
 import { api } from './api.js';
 
 const POLL_MS = 2000;
 const HEALTH_MS = 10000;
 
-/** UC00 has one primary screen: the support case board. */
-const SCREENS = [{ id: 'cases', label: 'Cases' }];
+const SCREENS = [
+  { id: 'cases', label: 'Cases' },
+  { id: 'config', label: 'Configuration' },
+];
 
 /**
  * The identity box is driven by `/info`, so the same image still takes its team and service
@@ -88,6 +91,7 @@ export default function App() {
       {screen === 'cases' && (
         <CaseBoardScreen cases={cases} error={error} loading={loading} info={info} />
       )}
+      {screen === 'config' && <CaseConfigScreen info={info} />}
     </AppShell>
   );
 }
