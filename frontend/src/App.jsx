@@ -1,15 +1,21 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { AppShell, Button, SideBrand, SideNav, StatusPill } from './design-system';
-import CaseBoardScreen from './components/CaseBoardScreen.jsx';
-import CaseConfigScreen from './components/CaseConfigScreen.jsx';
-import { api } from './api.js';
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  AppShell,
+  Button,
+  SideBrand,
+  SideNav,
+  StatusPill,
+} from "./design-system";
+import CaseBoardScreen from "./components/CaseBoardScreen.jsx";
+import CaseDetailScreen from "./components/CaseDetailScreen.jsx";
+import { api } from "./api.js";
 
 const POLL_MS = 2000;
 const HEALTH_MS = 10000;
 
 const SCREENS = [
-  { id: 'cases', label: 'Cases' },
-  { id: 'config', label: 'Configuration' },
+  { id: "cases", label: "Cases" },
+  { id: "detail", label: "Detail" },
 ];
 
 /**
@@ -17,17 +23,28 @@ const SCREENS = [
  * identity from environment configuration rather than hard-coded copy.
  */
 export default function App() {
-  const [screen, setScreen] = useState('cases');
-  const [configVersion, setConfigVersion] = useState(null);
-  const [cases, setCases] = useState([]);
+  const [screen, setScreen] = useState("cases");
+  const [queue, setQueue] = useState({ totalOpen: 0, breached: 0, cases: [] });
+  const [query, setQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState(null);
+  const [applicantNames, setApplicantNames] = useState({});
+  const [selectedCaseId, setSelectedCaseId] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [applicant, setApplicant] = useState(null);
+  const [applicantLoading, setApplicantLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [detailError, setDetailError] = useState(null);
+  const [applicantError, setApplicantError] = useState(null);
   const [health, setHealth] = useState(null);
   const [info, setInfo] = useState(null);
 
   const reload = useCallback(async () => {
     try {
-      setCases(await api.listCases());
+      setQueue(await api.queue());
       setError(null);
     } catch (e) {
       setError(e.message);
@@ -35,6 +52,107 @@ export default function App() {
       setLoading(false);
     }
   }, []);
+
+  const loadApplicant = useCallback(async (caseId) => {
+    setApplicantLoading(true);
+    setApplicantError(null);
+    try {
+      setApplicant(await api.getApplicant(caseId));
+    } catch (applicantFailure) {
+      setApplicant(null);
+      setApplicantError(applicantFailure.message);
+    } finally {
+      setApplicantLoading(false);
+    }
+  }, []);
+
+  const openCase = useCallback(async (caseId) => {
+    setSelectedCaseId(caseId);
+    setScreen("detail");
+    setDetailLoading(true);
+    setDetailError(null);
+    setApplicant(null);
+    loadApplicant(caseId);
+    try {
+      setDetail(await api.getCase(caseId));
+    } catch (e) {
+      setDetail(null);
+      setDetailError(e.message);
+    } finally {
+      setDetailLoading(false);
+    }
+  }, [loadApplicant]);
+
+  useEffect(() => {
+    const normalized = query.trim();
+    if (!normalized) {
+      setSearchResults([]);
+      setSearchError(null);
+      setSearchLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    const id = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const matches = await api.searchCases({
+          query: normalized,
+          limit: 10,
+        });
+        if (active) {
+          setSearchResults(matches);
+          setSearchError(null);
+        }
+      } catch (searchFailure) {
+        if (active) {
+          setSearchResults([]);
+          setSearchError(searchFailure.message);
+        }
+      } finally {
+        if (active) setSearchLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      active = false;
+      clearTimeout(id);
+    };
+  }, [query]);
+
+  const visibleCases = query.trim() ? searchResults : queue.cases;
+  const visibleCaseKey = visibleCases
+    .map((supportCase) => `${supportCase.caseId}:${supportCase.applicationId}`)
+    .join("|");
+
+  useEffect(() => {
+    let active = true;
+    const hydrateNames = async () => {
+      const entries = await Promise.all(
+        visibleCases.slice(0, 10).map(async (supportCase) => {
+          try {
+            const application = await api.getApplicant(supportCase.caseId);
+            return [
+              supportCase.caseId,
+              application.applicant?.fullName ?? "—",
+            ];
+          } catch {
+            return [supportCase.caseId, "—"];
+          }
+        }),
+      );
+      if (active) setApplicantNames(Object.fromEntries(entries));
+    };
+
+    if (visibleCases.length === 0) {
+      setApplicantNames({});
+    } else {
+      hydrateNames();
+    }
+    return () => {
+      active = false;
+    };
+  }, [visibleCaseKey]);
 
   useEffect(() => {
     reload();
@@ -58,15 +176,15 @@ export default function App() {
     return () => clearInterval(id);
   }, [refreshHealth]);
 
-  const up = !error && health?.status === 'UP';
+  const up = !error && health?.status === "UP";
 
   return (
     <AppShell
       side={
         <>
           <SideBrand
-            brand={info?.team ?? 'Team'}
-            product={info?.service ?? 'Module'}
+            brand={info?.team ?? "Team"}
+            product={info?.service ?? "Module"}
             meta={info ? `${info.serviceId} · ${info.domain}` : undefined}
           />
           <SideNav
@@ -80,7 +198,9 @@ export default function App() {
           {/* Health and refresh lived in the top bar; with the bar gone they belong beside the
               menu rather than inside it — a menu item that is not a screen is a trap. */}
           <div className="app-side-status">
-            <StatusPill tone={up ? 'positive' : 'negative'}>{up ? 'Up' : 'Down'}</StatusPill>
+            <StatusPill tone={up ? "positive" : "negative"}>
+              {up ? "Up" : "Down"}
+            </StatusPill>
             <Button
               variant="ghost"
               size="sm"
@@ -96,20 +216,33 @@ export default function App() {
       }
       footer="Customer support · cases come from the orchestrator, never from this UI"
     >
-      {screen === 'cases' && (
+      {screen === "cases" && (
         <CaseBoardScreen
-          cases={cases}
+          queue={queue}
+          query={query}
+          onQueryChange={setQuery}
+          searchResults={searchResults}
+          searchLoading={searchLoading}
+          searchError={searchError}
+          applicantNames={applicantNames}
           error={error}
           loading={loading}
           info={info}
-          onViewConfig={(version) => {
-            setConfigVersion(version);
-            setScreen('config');
-          }}
+          onOpenCase={openCase}
         />
       )}
-      {screen === 'config' && (
-        <CaseConfigScreen info={info} initialVersion={configVersion} />
+      {screen === "detail" && (
+        <CaseDetailScreen
+          caseId={selectedCaseId}
+          onBack={() => setScreen("cases")}
+          onRetry={() => loadApplicant(selectedCaseId)}
+          error={detailError}
+          applicantError={applicantError}
+          applicantLoading={applicantLoading}
+          loading={detailLoading}
+          detail={detail}
+          applicant={applicant}
+        />
       )}
     </AppShell>
   );

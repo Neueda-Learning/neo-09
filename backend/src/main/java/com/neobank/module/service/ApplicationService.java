@@ -1,18 +1,22 @@
 package com.neobank.module.service;
 
+import java.util.List;
+import java.util.concurrent.Executor;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.neobank.module.dto.DemoShowcaseView;
 import com.neobank.module.integrations.orchestrator.ApplicationRequest;
 import com.neobank.module.integrations.orchestrator.OrchestratorClient;
 import com.neobank.module.model.Decision;
 import com.neobank.module.model.DemoShowcase;
 import com.neobank.module.repository.DemoShowcaseRepository;
-import java.util.List;
-import java.util.concurrent.Executor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import com.neobank.module.support.service.OpenCaseCommand;
+import com.neobank.module.support.service.SupportCaseService;
 
 /**
  * <h2>Your module's work happens here. This is the class you came here to write.</h2>
@@ -49,6 +53,7 @@ public class ApplicationService {
     private final Executor executor;
     private final DemoShowcaseRepository demoShowcase;
     private final OrchestratorClient orchestrator;
+    private final SupportCaseService supportCases;
 
     /**
      * {@code applicationTaskExecutor} is the thread pool Spring Boot configures for you. Tune it in
@@ -58,10 +63,12 @@ public class ApplicationService {
      */
     public ApplicationService(@Qualifier("applicationTaskExecutor") Executor executor,
                               DemoShowcaseRepository demoShowcase,
-                              OrchestratorClient orchestrator) {
+                              OrchestratorClient orchestrator,
+                              SupportCaseService supportCases) {
         this.executor = executor;
         this.demoShowcase = demoShowcase;
         this.orchestrator = orchestrator;
+        this.supportCases = supportCases;
     }
 
     /**
@@ -91,6 +98,10 @@ public class ApplicationService {
     void processApplication(ApplicationRequest request) {
         String applicationId = request.applicationId();
         try {
+            // Bridge orchestrator applications into support cases so sidecar traffic is visible
+            // on the UC01/UC02 board without manual conversion calls.
+            bridgeToSupportCase(request);
+
             // 1 — say something. summary() is the one line every module logs on receipt.
             log.info("Hello world from processApplication — {}", request.summary());
 
@@ -107,6 +118,30 @@ public class ApplicationService {
             log.error("processApplication failed for {} — referring", applicationId, e);
             orchestrator.applicationStatusUpdate(applicationId, Decision.REFERRED,
                     "module error: " + e);
+        }
+    }
+
+    private void bridgeToSupportCase(ApplicationRequest request) {
+        // Keep the support-case idempotency key stable per application so different
+        // applications never collide when an upstream sender reuses correlation ids.
+        String correlationId = "app-" + request.applicationId();
+
+        String channel = request.application() == null || request.application().channel() == null
+                ? "UNKNOWN"
+                : request.application().channel();
+
+        String description = "Application review requested for " + request.applicationId();
+
+        try {
+            supportCases.accept(new OpenCaseCommand(
+                    request.applicationId(),
+                    correlationId,
+                    "APPLICATION_STATUS",
+                    description,
+                    channel));
+        } catch (RuntimeException ex) {
+            // Keep /api/v1/applications behavior stable even if support-case intake is down.
+            log.warn("Could not mirror application {} into support cases", request.applicationId(), ex);
         }
     }
 

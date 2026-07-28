@@ -5,11 +5,11 @@
 // app is served under a path prefix (/neo-09) and VITE_API_BASE is how every URL
 // picks it up. A raw fetch('/api/...') inside a component works on your laptop and 404s
 // on the load balancer.
-const BASE = import.meta.env.VITE_API_BASE || '';
+const BASE = import.meta.env.VITE_API_BASE || "";
 
 async function request(path, options = {}) {
   const res = await fetch(BASE + path, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
     ...options,
   });
   if (!res.ok) {
@@ -33,13 +33,19 @@ async function request(path, options = {}) {
 
 // This UI only ever READS. Applications arrive from the orchestrator — the real one, or the
 // sidecar playing it at http://localhost:9000 — never from a button in here. That is the
-// contract: your module is called, it does not call itself.
+// contrahttps://github.com/Neueda-Learning/neo-09/pull/5/conflict?name=frontend%252Fsrc%252Fapi.js&ancestor_oid=4ba861e90cd98b491a1b2663f8339bb1de432a79&base_oid=addd1915b956fd5b20156d0c889ed5ad305dfb4b&head_oid=4f193db7f8509e048527d0cdd852f1cc4d0c15c4ct: your module is called, it does not call itself.
 export const api = {
-  health: () => request('/health'),
-  info: () => request('/info'),
-  listCases: () => request('/api/v1/support/cases'),
-  createConfig: (payload) => request('/api/v1/support/config', { method: 'POST', body: JSON.stringify(payload) }),
-  listConfigVersions: () => request('/api/v1/support/config/versions'),
-  listApplications: () => request('/api/v1/applications'),
+  health: () => request("/health"),
+  info: () => request("/info"),
+  searchCases: ({ query, status, limit = 10 }) => {
+    const params = new URLSearchParams({ q: query, limit: String(limit) });
+    if (status) params.set("status", status);
+    return request(`/api/v1/support/cases?${params}`);
+  },
+  queue: () => request("/api/v1/support/cases/queue"),
+  getCase: (caseId) => request(`/api/v1/support/cases/${caseId}`),
+  getApplicant: (caseId) =>
+    request(`/api/v1/support/cases/${caseId}/applicant`),
+  listApplications: () => request("/api/v1/applications"),
   getApplication: (id) => request(`/api/v1/applications/${id}`),
 };
