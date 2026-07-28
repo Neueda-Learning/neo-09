@@ -1,0 +1,288 @@
+# Case-management core schema based on module-09 use-case requirements.
+# Additive migration: keeps demo_showcase intact while introducing real domain tables.
+databaseChangeLog:
+  - changeSet:
+      id: 002-create-case-management-core
+      author: neo-09
+      changes:
+        - createTable:
+            tableName: case_config
+            columns:
+              - column:
+                  name: version
+                  type: INT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: categories_json
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: priority_map_json
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sla_hours_json
+                  type: TEXT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: keyword_map_json
+                  type: TEXT
+              - column:
+                  name: effective_from
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - createTable:
+            tableName: support_case
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: case_id
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: application_id
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: correlation_id
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: customer_id
+                  type: VARCHAR(64)
+              - column:
+                  name: category
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: TEXT
+              - column:
+                  name: status
+                  type: VARCHAR(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: assignee
+                  type: VARCHAR(128)
+              - column:
+                  name: priority
+                  type: VARCHAR(2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: config_version
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: opened_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sla_deadline
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: paused_minutes
+                  type: INT
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: breached
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resolution_note
+                  type: TEXT
+              - column:
+                  name: resolved_at
+                  type: TIMESTAMP
+              - column:
+                  name: closed_at
+                  type: TIMESTAMP
+              - column:
+                  name: callback_sent
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: csat_score
+                  type: TINYINT
+              - column:
+                  name: csat_comment
+                  type: TEXT
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: support_case
+            baseColumnNames: config_version
+            referencedTableName: case_config
+            referencedColumnNames: version
+            constraintName: fk_support_case_config_version
+
+        - sql:
+            sql: "ALTER TABLE support_case ADD CONSTRAINT ck_support_case_priority CHECK (priority IN ('P1','P2','P3'))"
+
+        - sql:
+            sql: "ALTER TABLE support_case ADD CONSTRAINT ck_support_case_csat_score CHECK (csat_score IS NULL OR (csat_score >= 1 AND csat_score <= 5))"
+
+        - sql:
+            sql: "ALTER TABLE support_case ADD CONSTRAINT ck_support_case_paused_minutes CHECK (paused_minutes >= 0)"
+
+        - createTable:
+            tableName: case_event
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: case_id
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: event_type
+                  type: VARCHAR(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: actor
+                  type: VARCHAR(128)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: note
+                  type: TEXT
+              - column:
+                  name: detail
+                  type: TEXT
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - addForeignKeyConstraint:
+            baseTableName: case_event
+            baseColumnNames: case_id
+            referencedTableName: support_case
+            referencedColumnNames: case_id
+            constraintName: fk_case_event_case_id
+
+        - createIndex:
+            tableName: support_case
+            indexName: idx_support_case_status_priority
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: priority
+
+        - createIndex:
+            tableName: support_case
+            indexName: idx_support_case_deadline
+            columns:
+              - column:
+                  name: sla_deadline
+
+        - createIndex:
+            tableName: support_case
+            indexName: idx_support_case_breached
+            columns:
+              - column:
+                  name: breached
+
+        - createIndex:
+            tableName: support_case
+            indexName: idx_support_case_application
+            columns:
+              - column:
+                  name: application_id
+
+        - createIndex:
+            tableName: case_event
+            indexName: idx_case_event_case_time
+            columns:
+              - column:
+                  name: case_id
+              - column:
+                  name: created_at
+
+        - createIndex:
+            tableName: case_event
+            indexName: idx_case_event_type_time
+            columns:
+              - column:
+                  name: event_type
+              - column:
+                  name: created_at
+
+        - insert:
+            tableName: case_config
+            columns:
+              - column:
+                  name: version
+                  valueNumeric: 1
+              - column:
+                  name: categories_json
+                  value: '["APPLICATION_STATUS","CARD_NOT_ARRIVED","AGREEMENT_QUESTION","DATA_CORRECTION","COMPLAINT","OTHER"]'
+              - column:
+                  name: priority_map_json
+                  value: '{"APPLICATION_STATUS":"P3","CARD_NOT_ARRIVED":"P2","AGREEMENT_QUESTION":"P3","DATA_CORRECTION":"P2","COMPLAINT":"P1","OTHER":"P3"}'
+              - column:
+                  name: sla_hours_json
+                  value: '{"P1":4,"P2":24,"P3":72}'
+              - column:
+                  name: keyword_map_json
+                  value: '{"APPLICATION_STATUS":["status","application","progress"],"CARD_NOT_ARRIVED":["card","arrived","post","delivery"],"AGREEMENT_QUESTION":["agreement","terms","question"],"DATA_CORRECTION":["data","correction","wrong"],"COMPLAINT":["complaint","unhappy","issue"],"OTHER":["other","general"]}'
+
+      rollback:
+        - dropTable:
+            tableName: case_event
+        - dropTable:
+            tableName: support_case
+        - dropTable:
+            tableName: case_config
