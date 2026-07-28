@@ -78,6 +78,8 @@ curl -fsS "${ui_url}/" >/dev/null \
   || fail "UI is not reachable at ${ui_url}; run: docker compose up -d --build"
 check "backend ${backend_url}"
 check "UI ${ui_url}"
+printf '\n  注意：UC01/UC02 请看 %s\n' "${ui_url}"
+printf '  %s 是后端健康状态页，不显示 support_case。\n' "${backend_url}"
 
 if [[ "${clean_first}" == true ]]; then
   section "清理本模块的本地演示数据"
@@ -85,8 +87,7 @@ if [[ "${clean_first}" == true ]]; then
 fi
 
 section "1. 通过正式 open-case 接口准备演示数据"
-batch_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
-target_application="DEMO-${batch_id}-01"
+target_application="DEMO-UC01-UC02-01"
 categories=(
   CARD_NOT_ARRIVED
   COMPLAINT
@@ -104,8 +105,8 @@ categories=(
 
 for index in "${!categories[@]}"; do
   number="$(printf '%02d' "$((index + 1))")"
-  application_id="DEMO-${batch_id}-${number}"
-  correlation_id="demo-uc01-uc02-${batch_id}-${number}"
+  application_id="DEMO-UC01-UC02-${number}"
+  correlation_id="demo-uc01-uc02-${number}"
   category="${categories[$index]}"
   payload="$(
     jq -n \
@@ -136,7 +137,7 @@ for index in "${!categories[@]}"; do
   printf '.'
 done
 printf '\n'
-check "12 个 case 已通过真实 intake contract 创建（没有 UI 后门）"
+check "12 个请求已通过真实 intake contract 接收（重复运行会复用同一批 case）"
 
 target_case=""
 for _attempt in {1..20}; do
@@ -218,7 +219,8 @@ check "未知 caseId 返回 JSON 404，不是 500"
 present "观察右侧 Live applicant：成功时显示实时资料；当前 sidecar 不支持查询时显示 warning + Retry，详情和 Timeline 不受影响。"
 
 section "演示完成"
-printf '  UI:          %s\n' "${ui_url}"
+printf '  UC01/UC02 UI: %s  ← 浏览器请打开这个地址\n' "${ui_url}"
+printf '  Backend only: %s  ← 这里只是 API/健康状态页\n' "${backend_url}"
 printf '  Case ID:     %s\n' "${target_case}"
 printf '  Application: %s\n' "${target_application}"
 printf '\n  如需干净重演：./scripts/demo-uc01-uc02.sh --clean\n'
