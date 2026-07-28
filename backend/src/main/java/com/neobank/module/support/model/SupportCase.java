@@ -29,8 +29,8 @@ public class SupportCase {
     @Column(nullable = false, length = 64)
     private String category;
 
-    @Column(nullable = false)
     @Lob
+    @Column(nullable = false, length = 65_535)
     private String description;
 
     @Column(nullable = false, length = 32)

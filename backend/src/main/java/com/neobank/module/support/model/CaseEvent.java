@@ -26,8 +26,8 @@ public class CaseEvent {
     @Column(nullable = false, length = 128)
     private String actor;
 
-    @Column
     @Lob
+    @Column(length = 65_535)
     private String note;
 
     @Column(name = "created_at", nullable = false, updatable = false)
