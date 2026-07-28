@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Badge,
@@ -17,12 +17,19 @@ export default function CaseDetailScreen({
   onBack,
   onRetry,
   error,
+  transitionError,
+  transitionLoading,
+  onTransition,
   applicantError,
   applicantLoading,
   loading,
   detail,
   applicant,
 }) {
+  const [action, setAction] = useState("PICK_UP");
+  const [actor, setActor] = useState("a.khan");
+  const [note, setNote] = useState("");
+
   const timeline = useMemo(
     () =>
       (detail?.events ?? []).map((event) => ({
@@ -33,6 +40,43 @@ export default function CaseDetailScreen({
       })),
     [detail],
   );
+
+  const actions = useMemo(() => {
+    if (!detail) return [];
+    switch (detail.status) {
+      case "NEW":
+        return ["PICK_UP"];
+      case "OPEN":
+        return ["WAIT_CUSTOMER", "RESOLVE"];
+      case "PENDING_CUSTOMER":
+        return ["RESUME"];
+      case "RESOLVED":
+        return ["CLOSE", "REOPEN"];
+      default:
+        return [];
+    }
+  }, [detail]);
+
+  const requiresNote = action === "RESOLVE";
+
+  useEffect(() => {
+    if (actions.length > 0 && !actions.includes(action)) {
+      setAction(actions[0]);
+    }
+  }, [action, actions]);
+
+  const submitTransition = async (event) => {
+    event.preventDefault();
+    if (!onTransition || !detail) return;
+    await onTransition({
+      action,
+      actor,
+      note: note.trim() ? note.trim() : null,
+    });
+    if (action === "RESOLVE") {
+      setNote("");
+    }
+  };
 
   return (
     <>
@@ -134,6 +178,64 @@ export default function CaseDetailScreen({
                 ["Description", detail.description],
               ]}
             />
+
+            <form className="case-transition-form" onSubmit={submitTransition}>
+              <div className="case-transition-grid">
+                <label>
+                  Action
+                  <select
+                    value={action}
+                    onChange={(event) => setAction(event.target.value)}
+                    disabled={transitionLoading || actions.length === 0}
+                  >
+                    {actions.length === 0 ? (
+                      <option value="">No legal actions</option>
+                    ) : (
+                      actions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </label>
+
+                <label>
+                  Actor
+                  <input
+                    value={actor}
+                    onChange={(event) => setActor(event.target.value)}
+                    placeholder="agent id"
+                    disabled={transitionLoading || actions.length === 0}
+                    required
+                  />
+                </label>
+
+                <label className="case-transition-note">
+                  Note {requiresNote ? "(required for RESOLVE)" : "(optional)"}
+                  <textarea
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                    disabled={transitionLoading || actions.length === 0}
+                    required={requiresNote}
+                    rows={3}
+                  />
+                </label>
+              </div>
+
+              {transitionError && (
+                <Alert tone="negative" title="Transition failed">
+                  {transitionError}
+                </Alert>
+              )}
+
+              <Button
+                type="submit"
+                disabled={transitionLoading || actions.length === 0}
+              >
+                {transitionLoading ? "Applying..." : "Apply transition"}
+              </Button>
+            </form>
           </Card>
 
           <Card>

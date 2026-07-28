@@ -7,7 +7,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "support_case")
@@ -70,6 +72,12 @@ public class SupportCase {
     @Column(name = "closed_at")
     private Instant closedAt;
 
+    @Column(name = "paused_since")
+    private Instant pausedSince;
+
+    @Column(name = "callback_sent", nullable = false)
+    private boolean callbackSent;
+
     protected SupportCase() {
         // JPA
     }
@@ -92,6 +100,7 @@ public class SupportCase {
         this.openedAt = openedAt;
         this.pausedMinutes = 0;
         this.breached = false;
+        this.callbackSent = false;
     }
 
     public void price(String priority, Instant slaDeadline, int configVersion) {
@@ -171,7 +180,66 @@ public class SupportCase {
         return closedAt;
     }
 
+    public Instant getPausedSince() {
+        return pausedSince;
+    }
+
+    public boolean isCallbackSent() {
+        return callbackSent;
+    }
+
     public void markBreached(boolean breached) {
         this.breached = breached;
+    }
+
+    public void pickUp(String actor) {
+        this.status = "OPEN";
+        this.assignee = actor;
+    }
+
+    public void waitCustomer(Instant now) {
+        this.status = "PENDING_CUSTOMER";
+        this.pausedSince = now;
+    }
+
+    public void resume(Instant now) {
+        long newlyPaused = pausedSince == null ? 0 : pausedMinutesBetween(pausedSince, now);
+        this.pausedMinutes += (int) newlyPaused;
+        if (this.slaDeadline != null) {
+            this.slaDeadline = this.slaDeadline.plus(newlyPaused, ChronoUnit.MINUTES);
+        }
+        this.pausedSince = null;
+        this.status = "OPEN";
+    }
+
+    public void resolve(String note, Instant now) {
+        this.status = "RESOLVED";
+        this.resolutionNote = note;
+        this.resolvedAt = now;
+        this.pausedSince = null;
+    }
+
+    public void close(Instant now) {
+        this.status = "CLOSED";
+        this.closedAt = now;
+        this.pausedSince = null;
+    }
+
+    public void reopen(Instant freshDeadline) {
+        this.status = "OPEN";
+        this.resolutionNote = null;
+        this.resolvedAt = null;
+        this.closedAt = null;
+        this.pausedSince = null;
+        this.slaDeadline = freshDeadline;
+    }
+
+    public void markCallbackSent() {
+        this.callbackSent = true;
+    }
+
+    private static long pausedMinutesBetween(Instant from, Instant to) {
+        long minutes = Duration.between(from, to).toMinutes();
+        return Math.max(0, minutes);
     }
 }

@@ -6,6 +6,8 @@ import com.neobank.module.support.model.CaseEvent;
 
 public record SupportCaseEventView(
         String type,
+    String fromStatus,
+    String toStatus,
         String actor,
         String note,
         Instant at) {
@@ -13,6 +15,8 @@ public record SupportCaseEventView(
     public static SupportCaseEventView of(CaseEvent event) {
         return new SupportCaseEventView(
                 event.getEventType(),
+            event.getFromStatus(),
+            event.getToStatus(),
                 event.getActor(),
                 event.getNote(),
                 event.getCreatedAt());

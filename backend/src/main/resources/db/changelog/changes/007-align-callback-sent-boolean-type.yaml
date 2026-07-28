@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 007-align-callback-sent-boolean-type
+      author: neo-09
+      dbms: mysql
+      changes:
+        # Keep JPA boolean validation consistent on MySQL: Hibernate validates
+        # boolean fields against BIT(1) while BOOLEAN aliases are reported as TINYINT(1).
+        - sql:
+            sql: ALTER TABLE support_case MODIFY COLUMN callback_sent BIT(1) NOT NULL DEFAULT b'0'
+      rollback:
+        - sql:
+            sql: ALTER TABLE support_case MODIFY COLUMN callback_sent TINYINT(1) NOT NULL DEFAULT 0

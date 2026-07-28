@@ -38,6 +38,8 @@ export default function App() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState(null);
   const [detailError, setDetailError] = useState(null);
+  const [transitionError, setTransitionError] = useState(null);
+  const [transitionLoading, setTransitionLoading] = useState(false);
   const [applicantError, setApplicantError] = useState(null);
   const [health, setHealth] = useState(null);
   const [info, setInfo] = useState(null);
@@ -71,6 +73,7 @@ export default function App() {
     setScreen("detail");
     setDetailLoading(true);
     setDetailError(null);
+    setTransitionError(null);
     setApplicant(null);
     loadApplicant(caseId);
     try {
@@ -178,6 +181,28 @@ export default function App() {
 
   const up = !error && health?.status === "UP";
 
+  const transitionCase = useCallback(
+    async ({ action, actor, note }) => {
+      if (!selectedCaseId) return;
+      setTransitionLoading(true);
+      setTransitionError(null);
+      try {
+        const updated = await api.transitionCase(selectedCaseId, {
+          action,
+          actor,
+          note,
+        });
+        setDetail(updated);
+        await reload();
+      } catch (failure) {
+        setTransitionError(failure.message);
+      } finally {
+        setTransitionLoading(false);
+      }
+    },
+    [reload, selectedCaseId],
+  );
+
   return (
     <AppShell
       side={
@@ -192,7 +217,6 @@ export default function App() {
             active={screen}
             onSelect={(nextScreen) => {
               setScreen(nextScreen);
-              if (nextScreen === 'config') setConfigVersion(null);
             }}
           />
           {/* Health and refresh lived in the top bar; with the bar gone they belong beside the
@@ -237,6 +261,9 @@ export default function App() {
           onBack={() => setScreen("cases")}
           onRetry={() => loadApplicant(selectedCaseId)}
           error={detailError}
+          transitionError={transitionError}
+          transitionLoading={transitionLoading}
+          onTransition={transitionCase}
           applicantError={applicantError}
           applicantLoading={applicantLoading}
           loading={detailLoading}
