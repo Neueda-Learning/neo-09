@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.neobank.module.support.service.ApplicantLookupFailedException;
+import com.neobank.module.support.service.InvalidCaseConfigException;
 import com.neobank.module.support.service.InvalidOpenCaseException;
 
 /**
@@ -38,6 +39,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleInvalidOpenCase(
             InvalidOpenCaseException ex) {
         return error(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidCaseConfigException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidCaseConfig(
+            InvalidCaseConfigException ex) {
+        return error(HttpStatus.BAD_REQUEST, ex.getMessage(), ex.getFieldErrors());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
