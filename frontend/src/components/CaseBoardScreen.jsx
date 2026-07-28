@@ -3,13 +3,10 @@ import {
   Alert,
   Badge,
   Button,
-  Caption,
-  Card,
   ChipGroup,
   DataTable,
   EmptyState,
   Grid,
-  KeyValue,
   MetricTile,
   PageHeader,
   SearchInput,
@@ -118,14 +115,12 @@ export default function CaseBoardScreen({
         <Button
           size="sm"
           variant="ghost"
-          aria-expanded={supportCase.caseId === selectedCaseId}
-          onClick={() =>
-            setSelectedCaseId((current) =>
-              current === supportCase.caseId ? null : supportCase.caseId
-            )
-          }
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenCase?.(supportCase.caseId);
+          }}
         >
-          {supportCase.caseId === selectedCaseId ? 'Hide' : 'View'}
+          View
         </Button>
       ),
     },
@@ -225,47 +220,6 @@ export default function CaseBoardScreen({
             </EmptyState>
           }
         />
-      )}
-
-      {selectedCase && (
-        <Card
-          className="case-detail-card"
-          title={selectedCase.caseId}
-          subtitle={selectedCase.category}
-          headEnd={
-            <Badge tone={caseStatusTone(selectedCase.status)}>{selectedCase.status}</Badge>
-          }
-          foot={
-            <Button
-              variant="secondary"
-              disabled={selectedCase.configVersion == null}
-              onClick={() => onViewConfig?.(selectedCase.configVersion)}
-            >
-              View config v{selectedCase.configVersion ?? '—'}
-            </Button>
-          }
-        >
-          <KeyValue
-            items={[
-              { label: 'Application', value: selectedCase.applicationId, mono: true },
-              { label: 'Priority', value: selectedCase.priority ?? 'Pricing' },
-              { label: 'Opened', value: time(selectedCase.openedAt) },
-              {
-                label: 'SLA deadline',
-                value: selectedCase.slaDeadline ? time(selectedCase.slaDeadline) : 'Pricing…',
-              },
-              {
-                label: 'Pinned configuration',
-                value: selectedCase.configVersion ? `v${selectedCase.configVersion}` : 'Pricing…',
-              },
-              { label: 'Description', value: selectedCase.description },
-            ]}
-          />
-          <Caption>
-            The pinned configuration explains this case’s priority and deadline and never changes
-            when a newer policy is created.
-          </Caption>
-        </Card>
       )}
     </>
   );
