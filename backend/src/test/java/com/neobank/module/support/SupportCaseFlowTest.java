@@ -1,22 +1,15 @@
 package com.neobank.module.support;
 
+import java.time.Duration;
+import java.util.concurrent.Executor;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.aMapWithSize;
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
-import com.neobank.module.integrations.orchestrator.OrchestratorClient;
-import com.neobank.module.support.model.SupportCase;
-import com.neobank.module.support.repository.CaseEventRepository;
-import com.neobank.module.support.repository.SupportCaseRepository;
-import java.time.Duration;
-import java.util.concurrent.Executor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -27,6 +20,16 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.neobank.module.integrations.orchestrator.Application;
+import com.neobank.module.integrations.orchestrator.OrchestratorClient;
+import com.neobank.module.support.model.SupportCase;
+import com.neobank.module.support.repository.CaseEventRepository;
+import com.neobank.module.support.repository.SupportCaseRepository;
 
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:supportcasetest;MODE=MySQL;DB_CLOSE_DELAY=-1"
@@ -189,6 +192,28 @@ class SupportCaseFlowTest {
     }
 
     @Test
+    void queueAndCaseDetailAndApplicantEndpointsArePublished() throws Exception {
+        deliver(valid("corr-detail", "CARD_NOT_ARRIVED", "Card not here"));
+        String caseId = supportCases.findByCorrelationId("corr-detail").orElseThrow().getCaseId();
+                when(orchestrator.application("app-1001")).thenReturn(applicantApplication());
+
+        mvc.perform(get("/api/v1/support/cases/queue"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cases").isArray())
+                .andExpect(jsonPath("$.totalOpen").value(1));
+
+        mvc.perform(get("/api/v1/support/cases/" + caseId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.caseId").value(caseId))
+                .andExpect(jsonPath("$.events[0].type").value("CASE_OPENED"));
+
+        mvc.perform(get("/api/v1/support/cases/" + caseId + "/applicant"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.applicant.fullName").value("Maria Nowak"))
+                .andExpect(jsonPath("$.product.productCode").value("CREDIT_CARD_REWARDS"));
+    }
+
+    @Test
     void supportEndpointsArePublishedInOpenApi() throws Exception {
         mvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
@@ -207,5 +232,52 @@ class SupportCaseFlowTest {
     private static String valid(
             String correlationId, String category, String description) {
         return VALID.formatted(correlationId, category, description);
+    }
+
+    private static Application applicantApplication() {
+        return new Application(
+                "app-1001",
+                "MOBILE_APP",
+                "2026-07-25T09:14:00Z",
+                new Application.Applicant(
+                        "Maria Nowak",
+                        "1996-04-11",
+                        "maria@example.test",
+                        "+48123456789",
+                        "PL",
+                        "PL",
+                        java.util.List.of("PL"),
+                        "OWNER",
+                        new Application.Address(
+                                "1 Main St",
+                                null,
+                                "Warsaw",
+                                "00-001",
+                                "PL"),
+                        24,
+                        0),
+                new Application.IdentityDocument(
+                        "PASSPORT",
+                        "P1234567",
+                        "PL",
+                        "2030-01-01"),
+                new Application.Employment(
+                        "PERMANENT",
+                        "NeoBank",
+                        18),
+                new Application.Finances(
+                        900000,
+                        1200,
+                        300),
+                new Application.Product(
+                        "CREDIT_CARD_REWARDS",
+                        2800),
+                new Application.Delivery(
+                        true,
+                        null),
+                new Application.Consents(
+                        true,
+                        true,
+                        false));
     }
 }

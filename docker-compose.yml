@@ -27,14 +27,20 @@ services:
       # `docker compose down -v` once or the sidecar cannot reach its schema.
       - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}"]
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h localhost -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}",
+        ]
       interval: 5s
       timeout: 5s
       retries: 20
       start_period: 20s
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+    image: neo-09-backend:latest
     environment:
       DB_URL: ${DB_URL:-jdbc:mysql://mysql:3306/neo_09}
       DB_USERNAME: ${DB_USERNAME:-appuser}
@@ -61,17 +67,10 @@ services:
       retries: 12
       start_period: 40s
 
-  # The mock orchestrator: sends applications to your module and receives its callback.
-  #
-  # Built straight from its own public repo — there is NO sidecar source in this repo, nothing
-  # to drift, and nothing for you to maintain. The first build takes a few minutes; after that
-  # it is cached until the sidecar itself changes. Pick up a new version with:
-  #   docker compose up --build sidecar
-  #
-  # Do not replace this with a local path or a vendored copy. One repo, one copy — that is what
-  # stops ten teams ending up with ten different mock orchestrators.
   sidecar:
-    build: https://github.com/Neueda-Learning/neobank-sidecar.git#${SIDECAR_REF:-v1}
+    build:
+      context: ./sidecar
+    image: neo-09-sidecar:latest
     environment:
       DB_URL: jdbc:mysql://mysql:3306/sidecar_db
       DB_USERNAME: ${DB_USERNAME:-appuser}
@@ -94,7 +93,9 @@ services:
       start_period: 40s
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+    image: neo-09-frontend:latest
     ports:
       - "${FRONTEND_PORT:-5173}:80"
     depends_on:

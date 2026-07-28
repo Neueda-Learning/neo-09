@@ -1,15 +1,19 @@
 package com.neobank.module.controller;
 
-import com.neobank.module.support.service.InvalidOpenCaseException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.NoSuchElementException;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import com.neobank.module.support.service.ApplicantLookupFailedException;
+import com.neobank.module.support.service.InvalidOpenCaseException;
 
 /**
  * Turns exceptions into a stable JSON error shape, so the front end and the orchestrator get a
@@ -32,6 +36,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleInvalidOpenCase(
             InvalidOpenCaseException ex) {
         return error(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(NoSuchElementException.class)
+    public ResponseEntity<Map<String, Object>> handleNotFound(NoSuchElementException ex) {
+        return error(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(ApplicantLookupFailedException.class)
+    public ResponseEntity<Map<String, Object>> handleApplicantLookupFailed(ApplicantLookupFailedException ex) {
+        return error(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
     }
 
     /**

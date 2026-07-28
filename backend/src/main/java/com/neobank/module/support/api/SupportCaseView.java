@@ -1,7 +1,8 @@
 package com.neobank.module.support.api;
 
-import com.neobank.module.support.model.SupportCase;
 import java.time.Instant;
+
+import com.neobank.module.support.model.SupportCase;
 
 public record SupportCaseView(
         String caseId,
@@ -10,6 +11,7 @@ public record SupportCaseView(
         String category,
         String channel,
         String priority,
+        boolean breached,
         Instant slaDeadline,
         String description,
         Instant openedAt,
@@ -23,6 +25,7 @@ public record SupportCaseView(
                 supportCase.getCategory(),
                 supportCase.getChannel(),
                 supportCase.getPriority(),
+                false,
                 supportCase.getSlaDeadline(),
                 supportCase.getDescription(),
                 supportCase.getOpenedAt(),

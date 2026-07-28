@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from "react";
 import {
   Alert,
   Badge,
@@ -11,29 +11,37 @@ import {
   SearchInput,
   Spinner,
   Toolbar,
-} from '../design-system';
-import { caseStatusTone, priorityTone, time } from '../status.js';
+} from "../design-system";
+import { caseStatusTone, priorityTone, time } from "../status.js";
 
-const PRIORITIES = ['All', 'P1', 'P2', 'P3'];
+const PRIORITIES = ["All", "P1", "P2", "P3"];
 
-export default function CaseBoardScreen({ cases, error, loading, info }) {
-  const [query, setQuery] = useState('');
-  const [priority, setPriority] = useState('All');
+export default function CaseBoardScreen({
+  queue,
+  error,
+  loading,
+  info,
+  onOpenCase,
+}) {
+  const [query, setQuery] = useState("");
+  const [priority, setPriority] = useState("All");
+
+  const rows = queue?.cases ?? [];
 
   const counts = useMemo(
     () =>
-      cases.reduce((acc, supportCase) => {
-        const key = supportCase.priority ?? 'Pricing';
+      rows.reduce((acc, supportCase) => {
+        const key = supportCase.priority ?? "Pricing";
         acc[key] = (acc[key] ?? 0) + 1;
         return acc;
       }, {}),
-    [cases]
+    [rows],
   );
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return cases.filter((supportCase) => {
-      if (priority !== 'All' && supportCase.priority !== priority) return false;
+    return rows.filter((supportCase) => {
+      if (priority !== "All" && supportCase.priority !== priority) return false;
       if (!needle) return true;
       return [
         supportCase.caseId,
@@ -42,42 +50,56 @@ export default function CaseBoardScreen({ cases, error, loading, info }) {
         supportCase.description,
       ].some((value) => value?.toLowerCase().includes(needle));
     });
-  }, [cases, priority, query]);
+  }, [rows, priority, query]);
 
   const columns = [
     {
-      key: 'caseId',
-      header: 'Case',
+      key: "caseId",
+      header: "Case",
       mono: true,
       render: (supportCase) => (
-        <span title={supportCase.caseId}>{supportCase.caseId.replace('case-', '').slice(0, 8)}</span>
+        <span title={supportCase.caseId}>
+          {supportCase.caseId.replace("case-", "").slice(0, 8)}
+        </span>
       ),
     },
-    { key: 'category', header: 'Category' },
     {
-      key: 'priority',
-      header: 'Priority',
+      key: "applicationId",
+      header: "Application",
+      mono: true,
+      render: (supportCase) => supportCase.applicationId ?? "—",
+    },
+    { key: "category", header: "Category" },
+    {
+      key: "priority",
+      header: "Priority",
       tight: true,
       render: (supportCase) => (
         <Badge tone={priorityTone(supportCase.priority)}>
-          {supportCase.priority ?? 'Pricing'}
+          {supportCase.priority ?? "Pricing"}
         </Badge>
       ),
     },
     {
-      key: 'status',
-      header: 'Status',
+      key: "status",
+      header: "Status",
       tight: true,
       render: (supportCase) => (
-        <Badge tone={caseStatusTone(supportCase.status)}>{supportCase.status}</Badge>
+        <Badge tone={caseStatusTone(supportCase.status)}>
+          {supportCase.status}
+        </Badge>
       ),
     },
-    { key: 'openedAt', header: 'Opened', render: (supportCase) => time(supportCase.openedAt) },
     {
-      key: 'slaDeadline',
-      header: 'SLA deadline',
+      key: "openedAt",
+      header: "Opened",
+      render: (supportCase) => time(supportCase.openedAt),
+    },
+    {
+      key: "slaDeadline",
+      header: "SLA deadline",
       render: (supportCase) =>
-        supportCase.slaDeadline ? time(supportCase.slaDeadline) : 'Pricing…',
+        supportCase.slaDeadline ? time(supportCase.slaDeadline) : "Pricing…",
     },
   ];
 
@@ -99,10 +121,18 @@ export default function CaseBoardScreen({ cases, error, loading, info }) {
         </Alert>
       )}
 
-      <Grid cols={3} min={160} style={{ marginBottom: 'var(--ds-space-6)' }}>
-        <MetricTile label="On the board" value={cases.length} />
-        <MetricTile label="New" value={cases.filter((c) => c.status === 'NEW').length} tone="info" />
-        <MetricTile label="P1 priority" value={counts.P1 ?? 0} tone="negative" />
+      <Grid cols={3} min={160} style={{ marginBottom: "var(--ds-space-6)" }}>
+        <MetricTile label="Open cases" value={queue?.totalOpen ?? 0} />
+        <MetricTile
+          label="Breached"
+          value={queue?.breached ?? 0}
+          tone="negative"
+        />
+        <MetricTile
+          label="P1 priority"
+          value={counts.P1 ?? 0}
+          tone="negative"
+        />
       </Grid>
 
       <Toolbar>
@@ -130,15 +160,23 @@ export default function CaseBoardScreen({ cases, error, loading, info }) {
         <DataTable
           columns={columns}
           rows={matches}
-          total={matches.length}
+          total={queue?.totalOpen ?? matches.length}
           rowKey={(supportCase) => supportCase.caseId}
+          onRowClick={(supportCase) => onOpenCase?.(supportCase.caseId)}
           footnote="newest first · API capped at 10"
           empty={
-            <EmptyState title={cases.length === 0 ? 'No support cases yet' : 'No case matches that'}>
-              {cases.length === 0 ? (
+            <EmptyState
+              title={
+                rows.length === 0
+                  ? "No support cases yet"
+                  : "No case matches that"
+              }
+            >
+              {rows.length === 0 ? (
                 <>
-                  Send an <strong>open-case</strong> command through the orchestrator. This board is
-                  deliberately read-only: the customer journey is the only intake path.
+                  Send an <strong>open-case</strong> command through the
+                  orchestrator. This board is deliberately read-only: the
+                  customer journey is the only intake path.
                 </>
               ) : (
                 <>Clear the search or choose a different priority.</>

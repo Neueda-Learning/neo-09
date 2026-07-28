@@ -5,11 +5,11 @@
 // app is served under a path prefix (/neo-09) and VITE_API_BASE is how every URL
 // picks it up. A raw fetch('/api/...') inside a component works on your laptop and 404s
 // on the load balancer.
-const BASE = import.meta.env.VITE_API_BASE || '';
+const BASE = import.meta.env.VITE_API_BASE || "";
 
 async function request(path, options = {}) {
   const res = await fetch(BASE + path, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
     ...options,
   });
   if (!res.ok) {
@@ -32,9 +32,13 @@ async function request(path, options = {}) {
 // sidecar playing it at http://localhost:9000 — never from a button in here. That is the
 // contract: your module is called, it does not call itself.
 export const api = {
-  health: () => request('/health'),
-  info: () => request('/info'),
-  listCases: () => request('/api/v1/support/cases'),
-  listApplications: () => request('/api/v1/applications'),
+  health: () => request("/health"),
+  info: () => request("/info"),
+  listCases: () => request("/api/v1/support/cases"),
+  queue: () => request("/api/v1/support/cases/queue"),
+  getCase: (caseId) => request(`/api/v1/support/cases/${caseId}`),
+  getApplicant: (caseId) =>
+    request(`/api/v1/support/cases/${caseId}/applicant`),
+  listApplications: () => request("/api/v1/applications"),
   getApplication: (id) => request(`/api/v1/applications/${id}`),
 };

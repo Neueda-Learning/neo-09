@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # Build the Vite app, then serve the static bundle from nginx (which also proxies /api,
 # /health and /info to this slot's backend, so the browser stays same-origin).
 

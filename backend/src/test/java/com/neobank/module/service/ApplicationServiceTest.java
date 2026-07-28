@@ -1,6 +1,9 @@
 package com.neobank.module.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -15,9 +18,8 @@ import com.neobank.module.integrations.orchestrator.OrchestratorClient;
 import com.neobank.module.model.Decision;
 import com.neobank.module.model.DemoShowcase;
 import com.neobank.module.repository.DemoShowcaseRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
+import com.neobank.module.support.service.OpenCaseCommand;
+import com.neobank.module.support.service.SupportCaseService;
 
 /**
  * The three things the placeholder does, and the guard that keeps a failure reportable.
@@ -30,14 +32,16 @@ class ApplicationServiceTest {
 
     private DemoShowcaseRepository demoShowcase;
     private OrchestratorClient orchestrator;
+    private SupportCaseService supportCases;
     private ApplicationService service;
 
     @BeforeEach
     void setUp() {
         demoShowcase = mock(DemoShowcaseRepository.class);
         orchestrator = mock(OrchestratorClient.class);
+        supportCases = mock(SupportCaseService.class);
         // Runnable::run — the work happens inline, so there is nothing to wait for.
-        service = new ApplicationService(Runnable::run, demoShowcase, orchestrator);
+        service = new ApplicationService(Runnable::run, demoShowcase, orchestrator, supportCases);
         when(demoShowcase.save(any(DemoShowcase.class))).thenAnswer(call -> call.getArgument(0));
     }
 
@@ -56,6 +60,8 @@ class ApplicationServiceTest {
     void storesTheApplicationAndReportsItAccepted() {
         service.processApplication(request("SIM-01"));
 
+        verify(supportCases).accept(any(OpenCaseCommand.class));
+
         ArgumentCaptor<DemoShowcase> saved = ArgumentCaptor.forClass(DemoShowcase.class);
         verify(demoShowcase).save(saved.capture());
         assertThat(saved.getValue().getApplicationId()).isEqualTo("SIM-01");
@@ -69,6 +75,7 @@ class ApplicationServiceTest {
     void theAsyncEntryPointDoesTheSameWorkThroughTheExecutor() {
         service.processApplicationAsync(request("SIM-02"));
 
+        verify(supportCases).accept(any(OpenCaseCommand.class));
         verify(demoShowcase).save(any(DemoShowcase.class));
         verify(orchestrator).applicationStatusUpdate(eq("SIM-02"), eq(Decision.ACCEPTED), any());
     }

@@ -1,18 +1,24 @@
 package com.neobank.module.support.controller;
 
-import com.neobank.module.support.api.OpenCaseAcknowledgement;
-import com.neobank.module.support.api.OpenCaseRequest;
-import com.neobank.module.support.api.SupportCaseView;
-import com.neobank.module.support.service.OpenCaseCommand;
-import com.neobank.module.support.service.SupportCaseService;
-import jakarta.validation.Valid;
 import java.util.List;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.neobank.module.integrations.orchestrator.Application;
+import com.neobank.module.support.api.OpenCaseAcknowledgement;
+import com.neobank.module.support.api.OpenCaseRequest;
+import com.neobank.module.support.api.SupportCaseDetailView;
+import com.neobank.module.support.api.SupportCaseQueueResponse;
+import com.neobank.module.support.api.SupportCaseView;
+import com.neobank.module.support.service.OpenCaseCommand;
+import com.neobank.module.support.service.SupportCaseService;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/v1/support")
@@ -39,5 +45,20 @@ public class SupportController {
     @GetMapping("/cases")
     public List<SupportCaseView> listCases() {
         return supportCases.listCases();
+    }
+
+    @GetMapping("/cases/queue")
+    public SupportCaseQueueResponse queue() {
+        return supportCases.queue();
+    }
+
+    @GetMapping("/cases/{caseId}")
+    public SupportCaseDetailView getCase(@org.springframework.web.bind.annotation.PathVariable String caseId) {
+        return supportCases.getCase(caseId);
+    }
+
+    @GetMapping("/cases/{caseId}/applicant")
+    public Application applicant(@org.springframework.web.bind.annotation.PathVariable String caseId) {
+        return supportCases.applicant(caseId);
     }
 }

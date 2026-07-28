@@ -1,11 +1,12 @@
 package com.neobank.module.integrations.orchestrator;
 
-import com.neobank.module.model.Decision;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+
+import com.neobank.module.model.Decision;
 
 /**
  * The outbound half of the contract: telling the orchestrator what this module decided.
@@ -55,5 +56,12 @@ public class OrchestratorClient {
             log.warn("Status update to the orchestrator failed for {}: {} — its timeout sweeper "
                     + "will notice", applicationId, e.toString());
         }
+    }
+
+    public Application application(String applicationId) {
+        return http.get()
+                .uri(applicationsUrl + "/" + applicationId)
+                .retrieve()
+                .body(Application.class);
     }
 }

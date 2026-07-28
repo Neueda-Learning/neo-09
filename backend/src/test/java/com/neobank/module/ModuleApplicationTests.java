@@ -1,12 +1,9 @@
 package com.neobank.module;
 
-import static org.hamcrest.Matchers.hasSize;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import java.util.concurrent.Executor;
+
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -16,6 +13,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Boots the whole module against in-memory H2 (Liquibase applies the schema, JPA validates the
@@ -119,6 +120,19 @@ class ModuleApplicationTests {
                 .andExpect(jsonPath("$[?(@.applicationId == 'IT-ONE')].createdAt")
                         .value(org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.notNullValue())));
     }
+
+            @Test
+            void applicationIntakeAlsoCreatesASupportCaseForTheBoard() throws Exception {
+            mvc.perform(post("/api/v1/applications")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(application("SIM-01")))
+                .andExpect(status().isAccepted());
+
+            mvc.perform(get("/api/v1/support/cases"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.applicationId == 'SIM-01')].applicationId")
+                    .value(hasItem("SIM-01")));
+            }
 
     @Test
     void anApplicationWithoutAnIdIsRejected() throws Exception {
