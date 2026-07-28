@@ -23,6 +23,20 @@ export const statusTone = toneMapper({
  */
 export const STATUSES = ['ACCEPTED', 'REJECTED', 'REFERRED'];
 
+export const caseStatusTone = toneMapper({
+  NEW: TONES.INFO,
+  OPEN: TONES.WARNING,
+  PENDING_CUSTOMER: TONES.WARNING,
+  RESOLVED: TONES.POSITIVE,
+  CLOSED: TONES.NEUTRAL,
+});
+
+export const priorityTone = toneMapper({
+  P1: TONES.NEGATIVE,
+  P2: TONES.WARNING,
+  P3: TONES.NEUTRAL,
+});
+
 export function time(iso) {
   return iso ? new Date(iso).toLocaleTimeString() : '—';
 }

@@ -1,45 +1,34 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppShell, Button, SideBrand, SideNav, StatusPill } from './design-system';
-import RequestsScreen from './components/RequestsScreen.jsx';
+import CaseBoardScreen from './components/CaseBoardScreen.jsx';
 import { api } from './api.js';
 
 const POLL_MS = 2000;
 const HEALTH_MS = 10000;
 
-/**
- * The screens in the side menu.
- *
- * ⚠️ One real screen and three placeholders — the placeholders are there so the menu shows you
- * where your own screens go, and they are `disabled` so nobody clicks into nothing. Replace them
- * with what your business topic actually needs; the operator UI is a graded deliverable, and a
- * single read-only list is not one.
- */
-const SCREENS = [
-  { id: 'applications', label: 'Applications' },
-  { id: 'cases', label: 'Cases', hint: 'your own table', disabled: true },
-  { id: 'overrides', label: 'Overrides', hint: 'operator actions', disabled: true },
-  { id: 'settings', label: 'Settings', hint: 'reference data', disabled: true },
-];
+/** UC00 has one primary screen: the support case board. */
+const SCREENS = [{ id: 'cases', label: 'Cases' }];
 
 /**
- * A sidebar rather than a top bar: this app is expected to grow more screens than a row of tabs
- * holds, and the menu is where a team plans that growth. The identity box above it is the only
- * place the app says who it belongs to — its values come from `/info`, so the same image reads
- * "Team 07" once SERVICE_TEAM says so.
+ * The identity box is driven by `/info`, so the same image still takes its team and service
+ * identity from environment configuration rather than hard-coded copy.
  */
 export default function App() {
-  const [screen, setScreen] = useState('applications');
-  const [requests, setRequests] = useState([]);
+  const [screen, setScreen] = useState('cases');
+  const [cases, setCases] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [health, setHealth] = useState(null);
   const [info, setInfo] = useState(null);
 
   const reload = useCallback(async () => {
     try {
-      setRequests(await api.listApplications());
+      setCases(await api.listCases());
       setError(null);
     } catch (e) {
       setError(e.message);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -94,10 +83,10 @@ export default function App() {
           </div>
         </>
       }
-      footer="One of ten modules · applications come from the orchestrator, never from this UI"
+      footer="Customer support · cases come from the orchestrator, never from this UI"
     >
-      {screen === 'applications' && (
-        <RequestsScreen requests={requests} error={error} info={info} />
+      {screen === 'cases' && (
+        <CaseBoardScreen cases={cases} error={error} loading={loading} info={info} />
       )}
     </AppShell>
   );

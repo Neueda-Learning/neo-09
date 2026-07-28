@@ -19,3 +19,12 @@
   gap: var(--ds-space-3);
   padding: 0 var(--ds-space-2);
 }
+
+.case-board-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-3);
+  min-height: var(--ds-space-10);
+  color: var(--ds-color-text-muted);
+}

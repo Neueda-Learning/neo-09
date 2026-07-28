@@ -1,5 +1,6 @@
 package com.neobank.module.config;
 
+import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
@@ -17,5 +18,10 @@ public class AppConfig {
     @Bean
     public RestClient restClient(RestClient.Builder builder) {
         return builder.build();
+    }
+
+    @Bean
+    public Clock clock() {
+        return Clock.systemUTC();
     }
 }
