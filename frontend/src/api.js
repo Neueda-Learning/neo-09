@@ -14,14 +14,17 @@ async function request(path, options = {}) {
   });
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
+    let fieldErrors = {};
     try {
       const body = await res.json();
       if (body.message) message = body.message;
+      if (body.fieldErrors) fieldErrors = body.fieldErrors;
     } catch {
       /* non-JSON error body */
     }
     const error = new Error(message);
     error.status = res.status;
+    error.fieldErrors = fieldErrors;
     throw error;
   }
   if (res.status === 204) return null;

@@ -2,10 +2,14 @@ import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Badge,
+  Button,
+  Caption,
+  Card,
   ChipGroup,
   DataTable,
   EmptyState,
   Grid,
+  KeyValue,
   MetricTile,
   PageHeader,
   SearchInput,
@@ -16,9 +20,10 @@ import { caseStatusTone, priorityTone, time } from '../status.js';
 
 const PRIORITIES = ['All', 'P1', 'P2', 'P3'];
 
-export default function CaseBoardScreen({ cases, error, loading, info }) {
+export default function CaseBoardScreen({ cases, error, loading, info, onViewConfig }) {
   const [query, setQuery] = useState('');
   const [priority, setPriority] = useState('All');
+  const [selectedCaseId, setSelectedCaseId] = useState(null);
 
   const counts = useMemo(
     () =>
@@ -43,6 +48,10 @@ export default function CaseBoardScreen({ cases, error, loading, info }) {
       ].some((value) => value?.toLowerCase().includes(needle));
     });
   }, [cases, priority, query]);
+  const selectedCase = useMemo(
+    () => cases.find((supportCase) => supportCase.caseId === selectedCaseId) ?? null,
+    [cases, selectedCaseId]
+  );
 
   const columns = [
     {
@@ -78,6 +87,25 @@ export default function CaseBoardScreen({ cases, error, loading, info }) {
       header: 'SLA deadline',
       render: (supportCase) =>
         supportCase.slaDeadline ? time(supportCase.slaDeadline) : 'Pricing…',
+    },
+    {
+      key: 'details',
+      header: 'Details',
+      tight: true,
+      render: (supportCase) => (
+        <Button
+          size="sm"
+          variant="ghost"
+          aria-expanded={supportCase.caseId === selectedCaseId}
+          onClick={() =>
+            setSelectedCaseId((current) =>
+              current === supportCase.caseId ? null : supportCase.caseId
+            )
+          }
+        >
+          {supportCase.caseId === selectedCaseId ? 'Hide' : 'View'}
+        </Button>
+      ),
     },
   ];
 
@@ -146,6 +174,47 @@ export default function CaseBoardScreen({ cases, error, loading, info }) {
             </EmptyState>
           }
         />
+      )}
+
+      {selectedCase && (
+        <Card
+          className="case-detail-card"
+          title={selectedCase.caseId}
+          subtitle={selectedCase.category}
+          headEnd={
+            <Badge tone={caseStatusTone(selectedCase.status)}>{selectedCase.status}</Badge>
+          }
+          foot={
+            <Button
+              variant="secondary"
+              disabled={selectedCase.configVersion == null}
+              onClick={() => onViewConfig?.(selectedCase.configVersion)}
+            >
+              View config v{selectedCase.configVersion ?? '—'}
+            </Button>
+          }
+        >
+          <KeyValue
+            items={[
+              { label: 'Application', value: selectedCase.applicationId, mono: true },
+              { label: 'Priority', value: selectedCase.priority ?? 'Pricing' },
+              { label: 'Opened', value: time(selectedCase.openedAt) },
+              {
+                label: 'SLA deadline',
+                value: selectedCase.slaDeadline ? time(selectedCase.slaDeadline) : 'Pricing…',
+              },
+              {
+                label: 'Pinned configuration',
+                value: selectedCase.configVersion ? `v${selectedCase.configVersion}` : 'Pricing…',
+              },
+              { label: 'Description', value: selectedCase.description },
+            ]}
+          />
+          <Caption>
+            The pinned configuration explains this case’s priority and deadline and never changes
+            when a newer policy is created.
+          </Caption>
+        </Card>
       )}
     </>
   );

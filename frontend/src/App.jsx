@@ -18,6 +18,7 @@ const SCREENS = [
  */
 export default function App() {
   const [screen, setScreen] = useState('cases');
+  const [configVersion, setConfigVersion] = useState(null);
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -68,7 +69,14 @@ export default function App() {
             product={info?.service ?? 'Module'}
             meta={info ? `${info.serviceId} · ${info.domain}` : undefined}
           />
-          <SideNav items={SCREENS} active={screen} onSelect={setScreen} />
+          <SideNav
+            items={SCREENS}
+            active={screen}
+            onSelect={(nextScreen) => {
+              setScreen(nextScreen);
+              if (nextScreen === 'config') setConfigVersion(null);
+            }}
+          />
           {/* Health and refresh lived in the top bar; with the bar gone they belong beside the
               menu rather than inside it — a menu item that is not a screen is a trap. */}
           <div className="app-side-status">
@@ -89,9 +97,20 @@ export default function App() {
       footer="Customer support · cases come from the orchestrator, never from this UI"
     >
       {screen === 'cases' && (
-        <CaseBoardScreen cases={cases} error={error} loading={loading} info={info} />
+        <CaseBoardScreen
+          cases={cases}
+          error={error}
+          loading={loading}
+          info={info}
+          onViewConfig={(version) => {
+            setConfigVersion(version);
+            setScreen('config');
+          }}
+        />
       )}
-      {screen === 'config' && <CaseConfigScreen info={info} />}
+      {screen === 'config' && (
+        <CaseConfigScreen info={info} initialVersion={configVersion} />
+      )}
     </AppShell>
   );
 }

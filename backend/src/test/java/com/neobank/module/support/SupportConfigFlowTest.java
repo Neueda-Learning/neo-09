@@ -117,7 +117,39 @@ class SupportConfigFlowTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(containsString("categories")))
                 .andExpect(jsonPath("$.message").value(containsString("priorityMap")))
-                .andExpect(jsonPath("$.message").value(containsString("slaHours")));
+                .andExpect(jsonPath("$.message").value(containsString("slaHours")))
+                .andExpect(jsonPath("$.fieldErrors.categories[0]").value("must use UPPER_SNAKE"))
+                .andExpect(jsonPath("$.fieldErrors.priorityMap[0]").value(
+                        "is missing category complaint"))
+                .andExpect(jsonPath("$.fieldErrors.slaHours[0]").value(
+                        "must satisfy P1 < P2 < P3"));
+    }
+
+    @Test
+    void repeatedIdenticalConfigReturnsTheSameVersionWithoutAnotherInsert() throws Exception {
+        String request = """
+                {
+                  "categories": ["OTHER"],
+                  "priorityMap": {"OTHER": "P3"},
+                  "slaHours": {"P1":4,"P2":24,"P3":72}
+                }
+                """;
+
+        mvc.perform(post("/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.version").value(2));
+
+        mvc.perform(post("/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.version").value(2));
+
+        assertThat(caseConfigs.findAllByOrderByVersionAsc())
+                .extracting(config -> config.getVersion())
+                .containsExactly(1, 2);
     }
 
     @Test
