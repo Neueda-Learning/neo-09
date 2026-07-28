@@ -1,0 +1,51 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-complete-uc00-intake-schema
+      author: neo-09
+      changes:
+        # 002 is already deployable and therefore immutable. UC00 prices a case only
+        # after the intake transaction commits, so these computed fields begin null.
+        - dropNotNullConstraint:
+            tableName: support_case
+            columnName: priority
+            columnDataType: VARCHAR(2)
+        - dropNotNullConstraint:
+            tableName: support_case
+            columnName: config_version
+            columnDataType: INT
+        - dropNotNullConstraint:
+            tableName: support_case
+            columnName: sla_deadline
+            columnDataType: TIMESTAMP
+        - addColumn:
+            tableName: support_case
+            columns:
+              - column:
+                  name: channel
+                  type: VARCHAR(32)
+                  defaultValue: UNKNOWN
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: support_case
+            columnNames: correlation_id
+            constraintName: uk_support_case_correlation
+      rollback:
+        - dropUniqueConstraint:
+            tableName: support_case
+            constraintName: uk_support_case_correlation
+        - dropColumn:
+            tableName: support_case
+            columnName: channel
+        - addNotNullConstraint:
+            tableName: support_case
+            columnName: sla_deadline
+            columnDataType: TIMESTAMP
+        - addNotNullConstraint:
+            tableName: support_case
+            columnName: config_version
+            columnDataType: INT
+        - addNotNullConstraint:
+            tableName: support_case
+            columnName: priority
+            columnDataType: VARCHAR(2)

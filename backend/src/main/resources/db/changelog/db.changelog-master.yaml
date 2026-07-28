@@ -6,3 +6,7 @@ databaseChangeLog:
       file: db/changelog/changes/001-create-demo-showcase.yaml
   - include:
       file: db/changelog/changes/002-create-case-management-core.yaml
+  - include:
+      file: db/changelog/changes/003-complete-uc00-intake-schema.yaml
+  - include:
+      file: db/changelog/changes/004-use-json-types-for-case-config.yaml

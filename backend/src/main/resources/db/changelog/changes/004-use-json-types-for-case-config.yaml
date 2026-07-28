@@ -1,0 +1,54 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-use-json-types-for-case-config
+      author: neo-09
+      dbms: mysql
+      changes:
+        # CaseConfig is an insert-only, versioned configuration record. Keep the
+        # existing column names while enforcing native JSON storage for its maps.
+        - modifyDataType:
+            tableName: case_config
+            columnName: categories_json
+            newDataType: JSON
+        - modifyDataType:
+            tableName: case_config
+            columnName: priority_map_json
+            newDataType: JSON
+        - modifyDataType:
+            tableName: case_config
+            columnName: sla_hours_json
+            newDataType: JSON
+      rollback:
+        - modifyDataType:
+            tableName: case_config
+            columnName: sla_hours_json
+            newDataType: TEXT
+        - modifyDataType:
+            tableName: case_config
+            columnName: priority_map_json
+            newDataType: TEXT
+        - modifyDataType:
+            tableName: case_config
+            columnName: categories_json
+            newDataType: TEXT
+  - changeSet:
+      id: 004-use-json-types-for-case-config-h2
+      author: neo-09
+      dbms: h2
+      changes:
+        # H2's ordinary VARCHAR/TEXT -> JSON conversion wraps existing documents
+        # as JSON strings. FORMAT JSON preserves them as arrays/objects, matching
+        # MySQL's conversion and keeping test schema behaviour production-like.
+        - sql:
+            sql: ALTER TABLE case_config ALTER COLUMN categories_json JSON USING categories_json FORMAT JSON
+        - sql:
+            sql: ALTER TABLE case_config ALTER COLUMN priority_map_json JSON USING priority_map_json FORMAT JSON
+        - sql:
+            sql: ALTER TABLE case_config ALTER COLUMN sla_hours_json JSON USING sla_hours_json FORMAT JSON
+      rollback:
+        - sql:
+            sql: ALTER TABLE case_config ALTER COLUMN sla_hours_json TEXT USING CAST(sla_hours_json AS VARCHAR)
+        - sql:
+            sql: ALTER TABLE case_config ALTER COLUMN priority_map_json TEXT USING CAST(priority_map_json AS VARCHAR)
+        - sql:
+            sql: ALTER TABLE case_config ALTER COLUMN categories_json TEXT USING CAST(categories_json AS VARCHAR)

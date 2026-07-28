@@ -1,5 +1,6 @@
 package com.neobank.module.controller;
 
+import com.neobank.module.support.service.InvalidOpenCaseException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -26,6 +27,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(InvalidOpenCaseException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidOpenCase(
+            InvalidOpenCaseException ex) {
+        return error(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
 
     /**
      * A field failed validation — in practice, an envelope with no {@code applicationId}. The
