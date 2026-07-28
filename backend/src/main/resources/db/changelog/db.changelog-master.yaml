@@ -14,3 +14,5 @@ databaseChangeLog:
       file: db/changelog/changes/005-align-breached-boolean-type.yaml
   - include:
       file: db/changelog/changes/006-uc03-transition-columns.yaml
+  - include:
+      file: db/changelog/changes/007-align-callback-sent-boolean-type.yaml
