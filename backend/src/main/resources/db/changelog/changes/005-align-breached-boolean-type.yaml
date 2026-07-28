@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-align-breached-boolean-type
+      author: neo-09
+      dbms: mysql
+      changes:
+        # MySQL reports BOOLEAN aliases as TINYINT, while Hibernate's Boolean
+        # mapping validates against BIT. Align the existing deployed column
+        # without editing the already-applied 002 changeset.
+        - sql:
+            sql: ALTER TABLE support_case MODIFY COLUMN breached BIT(1) NOT NULL DEFAULT b'0'
+      rollback:
+        - sql:
+            sql: ALTER TABLE support_case MODIFY COLUMN breached TINYINT(1) NOT NULL DEFAULT 0
