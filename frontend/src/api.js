@@ -35,8 +35,8 @@ export const api = {
   health: () => request('/health'),
   info: () => request('/info'),
   listCases: () => request('/api/v1/support/cases'),
-  createConfig: (payload) => request('/config', { method: 'POST', body: JSON.stringify(payload) }),
-  listConfigVersions: () => request('/config/versions'),
+  createConfig: (payload) => request('/api/v1/support/config', { method: 'POST', body: JSON.stringify(payload) }),
+  listConfigVersions: () => request('/api/v1/support/config/versions'),
   listApplications: () => request('/api/v1/applications'),
   getApplication: (id) => request(`/api/v1/applications/${id}`),
 };
