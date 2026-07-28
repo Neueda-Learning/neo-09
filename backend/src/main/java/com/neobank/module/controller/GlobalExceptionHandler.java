@@ -3,7 +3,9 @@ package com.neobank.module.controller;
 import com.neobank.module.support.service.InvalidOpenCaseException;
 import com.neobank.module.support.service.InvalidCaseConfigException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,7 +40,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidCaseConfigException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidCaseConfig(
             InvalidCaseConfigException ex) {
-        return error(HttpStatus.BAD_REQUEST, ex.getMessage());
+        return error(HttpStatus.BAD_REQUEST, ex.getMessage(), ex.getFieldErrors());
     }
 
     /**
@@ -47,11 +49,16 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
-        String detail = ex.getBindingResult().getFieldErrors().stream()
-                .map(fe -> fe.getField() + " " + fe.getDefaultMessage())
-                .reduce((a, b) -> a + "; " + b)
+        Map<String, List<String>> fieldErrors = new LinkedHashMap<>();
+        ex.getBindingResult().getFieldErrors().forEach(fieldError ->
+                fieldErrors.computeIfAbsent(fieldError.getField(), ignored -> new ArrayList<>())
+                        .add(fieldError.getDefaultMessage()));
+        String detail = fieldErrors.entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream()
+                        .map(message -> entry.getKey() + " " + message))
+                .reduce((left, right) -> left + "; " + right)
                 .orElse("validation failed");
-        return error(HttpStatus.BAD_REQUEST, detail);
+        return error(HttpStatus.BAD_REQUEST, detail, fieldErrors);
     }
 
     /**
@@ -71,11 +78,21 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<Map<String, Object>> error(HttpStatus status, String message) {
+        return error(status, message, null);
+    }
+
+    private ResponseEntity<Map<String, Object>> error(
+            HttpStatus status,
+            String message,
+            Map<String, List<String>> fieldErrors) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", Instant.now().toString());
         body.put("status", status.value());
         body.put("error", status.getReasonPhrase());
         body.put("message", message);
+        if (fieldErrors != null && !fieldErrors.isEmpty()) {
+            body.put("fieldErrors", fieldErrors);
+        }
         return ResponseEntity.status(status).body(body);
     }
 }

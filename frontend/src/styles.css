@@ -29,23 +29,62 @@
   color: var(--ds-color-text-muted);
 }
 
+.case-detail-card {
+  margin-top: var(--ds-space-5);
+}
+
+.case-detail-card .ds-card__body {
+  display: grid;
+  gap: var(--ds-space-4);
+}
+
 .config-editor-pane,
 .config-history-pane {
   display: grid;
   gap: var(--ds-space-4);
 }
 
+.config-editor-pane h2,
 .config-editor-pane h3,
-.config-history-pane h3,
-.config-history-detail h4 {
+.config-history-pane h2,
+.config-history-pane h3 {
   margin: 0;
 }
 
-.config-history-detail {
-  display: grid;
+.config-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: var(--ds-space-3);
-  padding: var(--ds-space-3);
-  border: 1px solid var(--ds-color-border-muted);
-  border-radius: var(--ds-radius-md);
-  background: var(--ds-color-surface-elevated);
+}
+
+.config-section-heading .ds-caption {
+  margin: var(--ds-space-1) 0 0;
+}
+
+.config-subsection-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  padding-top: var(--ds-space-2);
+  border-top: var(--ds-border-width) solid var(--ds-color-border-subtle);
+}
+
+.config-subsection-heading span {
+  color: var(--ds-color-text-muted);
+  font-size: var(--ds-text-sm);
+}
+
+.config-history-pane .ds-card__body {
+  display: grid;
+  gap: var(--ds-space-4);
+}
+
+@media (max-width: 520px) {
+  .config-section-heading,
+  .config-subsection-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }

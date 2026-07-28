@@ -39,16 +39,25 @@ public class SupportConfigService {
     public CaseConfigVersionCreated createVersion(CaseConfigUpsertRequest request) {
         validate(request);
 
-        int nextVersion = configs.findTopByOrderByVersionDesc()
-                .map(c -> c.getVersion() + 1)
-                .orElse(1);
+        List<String> categories = normalizeCategories(request.categories());
+        Map<String, String> priorityMap = normalizePriorityMap(categories, request.priorityMap());
+        Map<String, Integer> slaHours = normalizeSlaHours(request.slaHours());
 
+        String categoriesJson = writeJson(categories);
+        String priorityMapJson = writeJson(priorityMap);
+        String slaHoursJson = writeJson(slaHours);
+
+        CaseConfig current = configs.lockCurrent().orElse(null);
+        if (current != null
+                && readCategories(current.getCategoriesJson()).equals(categories)
+                && readPriorityMap(current.getPriorityMapJson()).equals(priorityMap)
+                && readSlaHours(current.getSlaHoursJson()).equals(slaHours)) {
+            return new CaseConfigVersionCreated(current.getVersion());
+        }
+
+        int nextVersion = current == null ? 1 : current.getVersion() + 1;
         CaseConfig config = CaseConfig.create(
-                nextVersion,
-                writeJson(normalizeCategories(request.categories())),
-                writeJson(new LinkedHashMap<>(request.priorityMap())),
-            writeJson(new LinkedHashMap<>(request.slaHours())));
-
+                nextVersion, categoriesJson, priorityMapJson, slaHoursJson);
         configs.saveAndFlush(config);
         return new CaseConfigVersionCreated(nextVersion);
     }
@@ -75,17 +84,17 @@ public class SupportConfigService {
     }
 
     private void validate(CaseConfigUpsertRequest request) {
-        List<String> errors = new ArrayList<>();
+        Map<String, List<String>> errors = new LinkedHashMap<>();
         List<String> categories = normalizeCategories(request.categories());
 
         Set<String> unique = new LinkedHashSet<>(categories);
         if (unique.size() != categories.size()) {
-            errors.add("categories must be unique");
+            addError(errors, "categories", "must be unique");
         }
 
         for (String category : categories) {
             if (!UPPER_SNAKE.matcher(category).matches()) {
-                errors.add("categories must use UPPER_SNAKE");
+                addError(errors, "categories", "must use UPPER_SNAKE");
                 break;
             }
         }
@@ -94,43 +103,50 @@ public class SupportConfigService {
         Map<String, String> priorityMap = request.priorityMap();
         for (String category : categorySet) {
             if (!priorityMap.containsKey(category)) {
-                errors.add("priorityMap is missing category " + category);
+                addError(errors, "priorityMap", "is missing category " + category);
             }
         }
         for (String mapped : priorityMap.keySet()) {
             if (!categorySet.contains(mapped)) {
-                errors.add("priorityMap has unknown category " + mapped);
+                addError(errors, "priorityMap", "has unknown category " + mapped);
             }
         }
         for (Map.Entry<String, String> entry : priorityMap.entrySet()) {
             if (!PRIORITIES.contains(entry.getValue())) {
-                errors.add("priorityMap value must be one of P1/P2/P3");
+                addError(errors, "priorityMap", "values must be one of P1, P2 or P3");
                 break;
             }
         }
 
         Map<String, Integer> sla = request.slaHours();
         if (!sla.keySet().equals(PRIORITIES)) {
-            errors.add("slaHours must contain exactly P1, P2 and P3");
+            addError(errors, "slaHours", "must contain exactly P1, P2 and P3");
         } else {
             Integer p1 = sla.get("P1");
             Integer p2 = sla.get("P2");
             Integer p3 = sla.get("P3");
             if (p1 == null || p2 == null || p3 == null) {
-                errors.add("slaHours must contain exactly P1, P2 and P3");
+                addError(errors, "slaHours", "must contain exactly P1, P2 and P3");
             } else {
                 if (p1 <= 0 || p2 <= 0 || p3 <= 0) {
-                    errors.add("slaHours values must be positive");
+                    addError(errors, "slaHours", "values must be positive");
                 }
                 if (!(p1 < p2 && p2 < p3)) {
-                    errors.add("slaHours must satisfy P1 < P2 < P3");
+                    addError(errors, "slaHours", "must satisfy P1 < P2 < P3");
                 }
             }
         }
 
         if (!errors.isEmpty()) {
-            throw new InvalidCaseConfigException(String.join("; ", errors));
+            throw new InvalidCaseConfigException(errors);
         }
+    }
+
+    private void addError(
+            Map<String, List<String>> errors,
+            String field,
+            String message) {
+        errors.computeIfAbsent(field, ignored -> new ArrayList<>()).add(message);
     }
 
     private List<String> normalizeCategories(List<String> raw) {
@@ -139,6 +155,24 @@ public class SupportConfigService {
             categories.add(item == null ? "" : item.trim());
         }
         return categories;
+    }
+
+    private Map<String, String> normalizePriorityMap(
+            List<String> categories,
+            Map<String, String> raw) {
+        Map<String, String> normalized = new LinkedHashMap<>();
+        for (String category : categories) {
+            normalized.put(category, raw.get(category));
+        }
+        return normalized;
+    }
+
+    private Map<String, Integer> normalizeSlaHours(Map<String, Integer> raw) {
+        Map<String, Integer> normalized = new LinkedHashMap<>();
+        normalized.put("P1", raw.get("P1"));
+        normalized.put("P2", raw.get("P2"));
+        normalized.put("P3", raw.get("P3"));
+        return normalized;
     }
 
     private String writeJson(Object value) {
