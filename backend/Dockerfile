@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Multi-stage build: compile with Maven, run on a slim JRE. Built and run locally only.
 # The --mount=type=cache for ~/.m2 shares the Maven repo across every module build and
 # across rebuilds, so dependencies download once instead of per image.

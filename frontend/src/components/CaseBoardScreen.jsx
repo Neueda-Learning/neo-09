@@ -18,15 +18,21 @@ const PRIORITIES = ["All", "P1", "P2", "P3"];
 
 export default function CaseBoardScreen({
   queue,
+  query,
+  onQueryChange,
+  searchResults,
+  searchLoading,
+  searchError,
+  applicantNames,
   error,
   loading,
   info,
   onOpenCase,
 }) {
-  const [query, setQuery] = useState("");
   const [priority, setPriority] = useState("All");
 
-  const rows = queue?.cases ?? [];
+  const searching = Boolean(query.trim());
+  const rows = searching ? searchResults : (queue?.cases ?? []);
 
   const counts = useMemo(
     () =>
@@ -39,18 +45,11 @@ export default function CaseBoardScreen({
   );
 
   const matches = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return rows.filter((supportCase) => {
-      if (priority !== "All" && supportCase.priority !== priority) return false;
-      if (!needle) return true;
-      return [
-        supportCase.caseId,
-        supportCase.applicationId,
-        supportCase.category,
-        supportCase.description,
-      ].some((value) => value?.toLowerCase().includes(needle));
-    });
-  }, [rows, priority, query]);
+    return rows.filter(
+      (supportCase) =>
+        priority === "All" || supportCase.priority === priority,
+    );
+  }, [rows, priority]);
 
   const columns = [
     {
@@ -62,6 +61,12 @@ export default function CaseBoardScreen({
           {supportCase.caseId.replace("case-", "").slice(0, 8)}
         </span>
       ),
+    },
+    {
+      key: "applicant",
+      header: "Applicant",
+      render: (supportCase) =>
+        applicantNames[supportCase.caseId] ?? "Loading…",
     },
     {
       key: "applicationId",
@@ -120,6 +125,11 @@ export default function CaseBoardScreen({
           {error} — the board retries every two seconds.
         </Alert>
       )}
+      {searchError && (
+        <Alert tone="warning" title="Could not complete that search">
+          {searchError}. Try again when the orchestrator is available.
+        </Alert>
+      )}
 
       <Grid cols={3} min={160} style={{ marginBottom: "var(--ds-space-6)" }}>
         <MetricTile label="Open cases" value={queue?.totalOpen ?? 0} />
@@ -138,9 +148,9 @@ export default function CaseBoardScreen({
       <Toolbar>
         <SearchInput
           grow
-          placeholder="Case, application, category or description"
+          placeholder="Case ID, application ID or applicant name"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => onQueryChange(event.target.value)}
           aria-label="Search support cases"
         />
         <ChipGroup
@@ -151,35 +161,43 @@ export default function CaseBoardScreen({
         />
       </Toolbar>
 
-      {loading ? (
+      {loading || searchLoading ? (
         <div className="case-board-loading" aria-live="polite">
-          <Spinner label="Loading support cases" />
-          <span>Loading support cases…</span>
+          <Spinner
+            label={searching ? "Searching support cases" : "Loading support cases"}
+          />
+          <span>
+            {searching ? "Searching support cases…" : "Loading support cases…"}
+          </span>
         </div>
       ) : (
         <DataTable
           columns={columns}
           rows={matches}
-          total={queue?.totalOpen ?? matches.length}
+          total={
+            searching ? matches.length : (queue?.totalOpen ?? matches.length)
+          }
           rowKey={(supportCase) => supportCase.caseId}
           onRowClick={(supportCase) => onOpenCase?.(supportCase.caseId)}
-          footnote="newest first · API capped at 10"
+          footnote={
+            searching
+              ? "search results newest first · API capped at 10"
+              : "priority queue · worst first · API capped at 10"
+          }
           empty={
             <EmptyState
               title={
-                rows.length === 0
-                  ? "No support cases yet"
-                  : "No case matches that"
+                searching ? "No case matches that" : "No open support cases"
               }
             >
-              {rows.length === 0 ? (
+              {!searching ? (
                 <>
                   Send an <strong>open-case</strong> command through the
                   orchestrator. This board is deliberately read-only: the
                   customer journey is the only intake path.
                 </>
               ) : (
-                <>Clear the search or choose a different priority.</>
+                <>Refine the search or try a case or application ID.</>
               )}
             </EmptyState>
           }

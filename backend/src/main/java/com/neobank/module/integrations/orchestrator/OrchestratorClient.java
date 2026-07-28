@@ -1,5 +1,8 @@
 package com.neobank.module.integrations.orchestrator;
 
+import java.util.List;
+
+import org.springframework.core.ParameterizedTypeReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -63,5 +66,13 @@ public class OrchestratorClient {
                 .uri(applicationsUrl + "/" + applicationId)
                 .retrieve()
                 .body(Application.class);
+    }
+
+    public List<Application> applicationsByName(String name) {
+        List<Application> applications = http.get()
+                .uri(applicationsUrl + "?name={name}", name)
+                .retrieve()
+                .body(new ParameterizedTypeReference<>() { });
+        return applications == null ? List.of() : applications;
     }
 }

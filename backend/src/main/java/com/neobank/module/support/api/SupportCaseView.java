@@ -18,6 +18,10 @@ public record SupportCaseView(
         Integer configVersion) {
 
     public static SupportCaseView of(SupportCase supportCase) {
+        return of(supportCase, supportCase.isBreached());
+    }
+
+    public static SupportCaseView of(SupportCase supportCase, boolean breached) {
         return new SupportCaseView(
                 supportCase.getCaseId(),
                 supportCase.getApplicationId(),
@@ -25,7 +29,7 @@ public record SupportCaseView(
                 supportCase.getCategory(),
                 supportCase.getChannel(),
                 supportCase.getPriority(),
-                false,
+                breached,
                 supportCase.getSlaDeadline(),
                 supportCase.getDescription(),
                 supportCase.getOpenedAt(),

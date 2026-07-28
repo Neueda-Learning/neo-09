@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.client.RestClientException;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -43,6 +45,9 @@ public class SupportCaseService {
 
     private static final Logger log = LoggerFactory.getLogger(SupportCaseService.class);
     private static final TypeReference<Set<String>> CATEGORY_SET = new TypeReference<>() { };
+    private static final Set<String> CASE_STATUSES =
+            Set.of("NEW", "OPEN", "PENDING_CUSTOMER", "RESOLVED", "CLOSED");
+    private static final String NO_APPLICATION_MATCH = "__no_application_match__";
 
     private final Executor executor;
     private final SupportCaseRepository supportCases;
@@ -124,63 +129,108 @@ public class SupportCaseService {
         return SupportCaseView.of(created);
     }
 
-    public List<SupportCaseView> listCases() {
-        return supportCases.findAllByOrderByOpenedAtDescIdDesc(PageRequest.of(0, 10)).stream()
-                .map(SupportCaseView::of)
+    @Transactional
+    public List<SupportCaseView> searchCases(String query, String status, int limit) {
+        String normalizedQuery = query == null ? "" : query.trim();
+        if (normalizedQuery.isEmpty()) {
+            return List.of();
+        }
+        if (limit < 1 || limit > 10) {
+            throw new IllegalArgumentException("limit must be between 1 and 10");
+        }
+        String normalizedStatus = status == null || status.isBlank()
+                ? null
+                : status.trim().toUpperCase();
+        if (normalizedStatus != null && !CASE_STATUSES.contains(normalizedStatus)) {
+            throw new IllegalArgumentException("unknown case status: " + status);
+        }
+
+        LinkedHashSet<String> applicationIds = new LinkedHashSet<>();
+        applicationIds.add(NO_APPLICATION_MATCH);
+        try {
+            orchestrator.applicationsByName(normalizedQuery).stream()
+                    .map(Application::applicationId)
+                    .filter(applicationId -> applicationId != null && !applicationId.isBlank())
+                    .forEach(applicationIds::add);
+        } catch (RestClientException ex) {
+            log.warn("Applicant name search unavailable for '{}': {}",
+                    normalizedQuery, ex.toString());
+        }
+
+        Instant now = clock.instant();
+        return supportCases.search(
+                        normalizedQuery,
+                        normalizedStatus,
+                        List.copyOf(applicationIds),
+                        PageRequest.of(0, limit))
+                .stream()
+                .map(supportCase -> SupportCaseView.of(
+                        supportCase, refreshBreached(supportCase, now)))
                 .toList();
     }
 
-        public SupportCaseQueueResponse queue() {
+    @Transactional
+    public SupportCaseQueueResponse queue() {
         Instant now = clock.instant();
-        List<SupportCaseQueueRow> openCases = supportCases.findAll().stream()
-            .filter(supportCase -> isOpen(supportCase.getStatus()))
-            .map(supportCase -> toQueueRow(supportCase, now))
-            .sorted(queueOrder())
-            .limit(10)
-            .toList();
+        List<SupportCaseQueueRow> allOpenCases = supportCases.findAll().stream()
+                .filter(supportCase -> isOpen(supportCase.getStatus()))
+                .map(supportCase -> {
+                    refreshBreached(supportCase, now);
+                    return toQueueRow(supportCase, now);
+                })
+                .sorted(queueOrder())
+                .toList();
 
-        int totalOpen = (int) supportCases.findAll().stream()
-            .filter(supportCase -> isOpen(supportCase.getStatus()))
-            .count();
-        int breached = (int) supportCases.findAll().stream()
-            .filter(supportCase -> isOpen(supportCase.getStatus()))
-            .map(supportCase -> toQueueRow(supportCase, now))
-            .filter(SupportCaseQueueRow::breached)
-            .count();
+        List<SupportCaseQueueRow> visibleCases = allOpenCases.stream()
+                .limit(10)
+                .toList();
+        int breached = (int) allOpenCases.stream()
+                .filter(SupportCaseQueueRow::breached)
+                .count();
 
-        return new SupportCaseQueueResponse(totalOpen, breached, openCases);
-        }
+        return new SupportCaseQueueResponse(allOpenCases.size(), breached, visibleCases);
+    }
 
-        public SupportCaseDetailView getCase(String caseId) {
+    @Transactional
+    public SupportCaseDetailView getCase(String caseId) {
         SupportCase supportCase = supportCases.findByCaseId(caseId)
-            .orElseThrow(() -> new NoSuchElementException("case not found: " + caseId));
+                .orElseThrow(() -> new NoSuchElementException("case not found: " + caseId));
         List<SupportCaseEventView> events = caseEvents.findAllByCaseIdOrderByCreatedAtAscIdAsc(caseId)
-            .stream()
-            .map(SupportCaseEventView::of)
-            .toList();
+                .stream()
+                .map(SupportCaseEventView::of)
+                .toList();
         return new SupportCaseDetailView(
-            supportCase.getCaseId(),
-            supportCase.getStatus(),
-            supportCase.getCategory(),
-            supportCase.getPriority(),
-            supportCase.getSlaDeadline(),
-            breached(supportCase, clock.instant()),
-            supportCase.getApplicationId(),
-            supportCase.getConfigVersion(),
-            events);
-        }
+                supportCase.getCaseId(),
+                supportCase.getStatus(),
+                supportCase.getCategory(),
+                supportCase.getChannel(),
+                supportCase.getPriority(),
+                supportCase.getSlaDeadline(),
+                refreshBreached(supportCase, clock.instant()),
+                supportCase.getApplicationId(),
+                supportCase.getCorrelationId(),
+                supportCase.getConfigVersion(),
+                supportCase.getDescription(),
+                supportCase.getAssignee(),
+                supportCase.getPausedMinutes(),
+                supportCase.getResolutionNote(),
+                supportCase.getOpenedAt(),
+                supportCase.getResolvedAt(),
+                supportCase.getClosedAt(),
+                events);
+    }
 
-        public Application applicant(String caseId) {
+    public Application applicant(String caseId) {
         SupportCase supportCase = supportCases.findByCaseId(caseId)
-            .orElseThrow(() -> new NoSuchElementException("case not found: " + caseId));
+                .orElseThrow(() -> new NoSuchElementException("case not found: " + caseId));
         try {
-                return orchestrator.application(supportCase.getApplicationId());
+            return orchestrator.application(supportCase.getApplicationId());
         } catch (org.springframework.web.client.HttpClientErrorException.NotFound ex) {
             throw new NoSuchElementException("application not found — link may be stale");
-        } catch (org.springframework.web.client.RestClientException ex) {
+        } catch (RestClientException ex) {
             throw new ApplicantLookupFailedException("application lookup unavailable");
         }
-        }
+    }
 
     private void validateCategory(String category, CaseConfig config) {
         try {
@@ -206,14 +256,18 @@ public class SupportCaseService {
                 supportCase.getStatus(),
                 supportCase.getCategory(),
                 supportCase.getPriority(),
-                breached(supportCase, now),
+                supportCase.isBreached(),
                 overdueHours(supportCase, now),
-                supportCase.getApplicationId());
+                supportCase.getApplicationId(),
+                supportCase.getSlaDeadline(),
+                supportCase.getOpenedAt());
     }
 
     private Comparator<SupportCaseQueueRow> queueOrder() {
         return Comparator.comparing(SupportCaseQueueRow::breached).reversed()
-                .thenComparing(SupportCaseQueueRow::overdueHours, Comparator.reverseOrder())
+                .thenComparing(
+                        SupportCaseQueueRow::slaDeadline,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(SupportCaseQueueRow::caseId);
     }
 
@@ -221,14 +275,23 @@ public class SupportCaseService {
         return "NEW".equals(status) || "OPEN".equals(status) || "PENDING_CUSTOMER".equals(status);
     }
 
-    private boolean breached(SupportCase supportCase, Instant now) {
+    private boolean currentBreach(SupportCase supportCase, Instant now) {
         return supportCase.getSlaDeadline() != null
                 && supportCase.getSlaDeadline().isBefore(now)
-                && isOpen(supportCase.getStatus());
+                && ("NEW".equals(supportCase.getStatus())
+                    || "OPEN".equals(supportCase.getStatus()));
+    }
+
+    private boolean refreshBreached(SupportCase supportCase, Instant now) {
+        boolean breached = currentBreach(supportCase, now);
+        if (supportCase.isBreached() != breached) {
+            supportCase.markBreached(breached);
+        }
+        return breached;
     }
 
     private double overdueHours(SupportCase supportCase, Instant now) {
-        if (supportCase.getSlaDeadline() == null) {
+        if (!currentBreach(supportCase, now)) {
             return 0.0;
         }
         return Math.max(0.0, Duration.between(supportCase.getSlaDeadline(), now).toMinutes() / 60.0);

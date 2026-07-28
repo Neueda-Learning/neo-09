@@ -4,9 +4,11 @@ import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.neobank.module.integrations.orchestrator.Application;
@@ -43,8 +45,11 @@ public class SupportController {
     }
 
     @GetMapping("/cases")
-    public List<SupportCaseView> listCases() {
-        return supportCases.listCases();
+    public List<SupportCaseView> searchCases(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "10") int limit) {
+        return supportCases.searchCases(q, status, limit);
     }
 
     @GetMapping("/cases/queue")
@@ -53,12 +58,12 @@ public class SupportController {
     }
 
     @GetMapping("/cases/{caseId}")
-    public SupportCaseDetailView getCase(@org.springframework.web.bind.annotation.PathVariable String caseId) {
+    public SupportCaseDetailView getCase(@PathVariable String caseId) {
         return supportCases.getCase(caseId);
     }
 
     @GetMapping("/cases/{caseId}/applicant")
-    public Application applicant(@org.springframework.web.bind.annotation.PathVariable String caseId) {
+    public Application applicant(@PathVariable String caseId) {
         return supportCases.applicant(caseId);
     }
 }

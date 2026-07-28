@@ -1,5 +1,7 @@
 package com.neobank.module.support.api;
 
+import java.time.Instant;
+
 public record SupportCaseQueueRow(
         String caseId,
         String status,
@@ -7,5 +9,7 @@ public record SupportCaseQueueRow(
         String priority,
         boolean breached,
         double overdueHours,
-        String applicationId) {
+        String applicationId,
+        Instant slaDeadline,
+        Instant openedAt) {
 }

@@ -38,9 +38,7 @@ services:
       start_period: 20s
 
   backend:
-    build:
-      context: ./backend
-    image: neo-09-backend:latest
+    build: ./backend
     environment:
       DB_URL: ${DB_URL:-jdbc:mysql://mysql:3306/neo_09}
       DB_USERNAME: ${DB_USERNAME:-appuser}
@@ -67,10 +65,10 @@ services:
       retries: 12
       start_period: 40s
 
+  # The mock orchestrator is built from its single canonical repository.
+  # Do not vendor it here: all ten modules must exercise the same caller.
   sidecar:
-    build:
-      context: ./sidecar
-    image: neo-09-sidecar:latest
+    build: https://github.com/Neueda-Learning/neobank-sidecar.git#${SIDECAR_REF:-v1}
     environment:
       DB_URL: jdbc:mysql://mysql:3306/sidecar_db
       DB_USERNAME: ${DB_USERNAME:-appuser}
@@ -93,9 +91,7 @@ services:
       start_period: 40s
 
   frontend:
-    build:
-      context: ./frontend
-    image: neo-09-frontend:latest
+    build: ./frontend
     ports:
       - "${FRONTEND_PORT:-5173}:80"
     depends_on:

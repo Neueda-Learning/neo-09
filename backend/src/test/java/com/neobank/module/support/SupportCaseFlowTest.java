@@ -1,6 +1,8 @@
 package com.neobank.module.support;
 
 import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.Executor;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -9,7 +11,9 @@ import static org.hamcrest.Matchers.containsString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,6 +21,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -24,6 +29,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 
 import com.neobank.module.integrations.orchestrator.Application;
 import com.neobank.module.integrations.orchestrator.OrchestratorClient;
@@ -184,11 +191,84 @@ class SupportCaseFlowTest {
     void caseIsImmediatelyVisibleOnTheCappedBoardApi() throws Exception {
         deliver(valid("corr-board", "DATA_CORRECTION", "My address is wrong"));
 
-        mvc.perform(get("/api/v1/support/cases"))
+        mvc.perform(get("/api/v1/support/cases").param("q", "app-1001"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].status").value("NEW"))
                 .andExpect(jsonPath("$[0].category").value("DATA_CORRECTION"))
                 .andExpect(jsonPath("$[0].priority").value("P2"));
+    }
+
+    @Test
+    void searchIsEmptyByDefaultAndFindsApplicantNamesWithoutPersistingThem() throws Exception {
+        deliver(valid("corr-search", "CARD_NOT_ARRIVED", "Card not here"));
+
+        mvc.perform(get("/api/v1/support/cases"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+        verifyNoInteractions(orchestrator);
+
+        when(orchestrator.applicationsByName("Maria"))
+                .thenReturn(List.of(applicantApplication()));
+        mvc.perform(get("/api/v1/support/cases")
+                        .param("q", "Maria")
+                        .param("limit", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].applicationId").value("app-1001"))
+                .andExpect(jsonPath("$[0].category").value("CARD_NOT_ARRIVED"));
+        verify(orchestrator).applicationsByName("Maria");
+
+        assertThat(jdbc.queryForObject(
+                "select customer_id from support_case where correlation_id = ?",
+                String.class,
+                "corr-search")).isNull();
+    }
+
+    @Test
+    void searchIsCappedAtTenAndRejectsAnOversizedLimit() throws Exception {
+        for (int index = 0; index < 11; index++) {
+            deliver(valid("corr-cap-" + index, "OTHER", "Case " + index));
+        }
+
+        mvc.perform(get("/api/v1/support/cases")
+                        .param("q", "app-1001")
+                        .param("limit", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(10));
+
+        mvc.perform(get("/api/v1/support/cases")
+                        .param("q", "app-1001")
+                        .param("limit", "11"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("limit must be between 1 and 10"));
+    }
+
+    @Test
+    void queueIsWorstFirstAndPersistsBreachChanges() throws Exception {
+        deliver(valid("corr-most-overdue", "COMPLAINT", "Old breach"));
+        deliver(valid("corr-less-overdue", "COMPLAINT", "Recent breach"));
+        deliver(valid("corr-healthy", "COMPLAINT", "Healthy"));
+
+        Instant now = Instant.now();
+        jdbc.update("update support_case set sla_deadline = ? where correlation_id = ?",
+                now.minus(Duration.ofHours(5)), "corr-most-overdue");
+        jdbc.update("update support_case set sla_deadline = ? where correlation_id = ?",
+                now.minus(Duration.ofHours(1)), "corr-less-overdue");
+        jdbc.update("update support_case set sla_deadline = ? where correlation_id = ?",
+                now.plus(Duration.ofHours(1)), "corr-healthy");
+
+        String mostOverdueCaseId = supportCases
+                .findByCorrelationId("corr-most-overdue").orElseThrow().getCaseId();
+        mvc.perform(get("/api/v1/support/cases/queue"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalOpen").value(3))
+                .andExpect(jsonPath("$.breached").value(2))
+                .andExpect(jsonPath("$.cases[0].caseId").value(mostOverdueCaseId))
+                .andExpect(jsonPath("$.cases[0].breached").value(true));
+
+        assertThat(jdbc.queryForObject(
+                "select breached from support_case where correlation_id = ?",
+                Boolean.class,
+                "corr-most-overdue")).isTrue();
     }
 
     @Test
@@ -205,12 +285,39 @@ class SupportCaseFlowTest {
         mvc.perform(get("/api/v1/support/cases/" + caseId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.caseId").value(caseId))
+                .andExpect(jsonPath("$.description").value("Card not here"))
+                .andExpect(jsonPath("$.channel").value("MOBILE_APP"))
+                .andExpect(jsonPath("$.pausedMinutes").value(0))
                 .andExpect(jsonPath("$.events[0].type").value("CASE_OPENED"));
 
         mvc.perform(get("/api/v1/support/cases/" + caseId + "/applicant"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.applicant.fullName").value("Maria Nowak"))
                 .andExpect(jsonPath("$.product.productCode").value("CREDIT_CARD_REWARDS"));
+
+        mvc.perform(get("/api/v1/support/cases/does-not-exist"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("case not found: does-not-exist"));
+    }
+
+    @Test
+    void applicantLookupDegradesToJson404Or503() throws Exception {
+        deliver(valid("corr-orphan", "OTHER", "Old application link"));
+        String caseId = supportCases.findByCorrelationId("corr-orphan").orElseThrow().getCaseId();
+
+        when(orchestrator.application("app-1001")).thenThrow(
+                HttpClientErrorException.create(
+                        HttpStatus.NOT_FOUND, "not found", null, null, null));
+        mvc.perform(get("/api/v1/support/cases/" + caseId + "/applicant"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message")
+                        .value("application not found — link may be stale"));
+
+        doThrow(new RestClientException("connection refused"))
+                .when(orchestrator).application("app-1001");
+        mvc.perform(get("/api/v1/support/cases/" + caseId + "/applicant"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.message").value("application lookup unavailable"));
     }
 
     @Test
@@ -219,7 +326,10 @@ class SupportCaseFlowTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.openapi").value(containsString("3.0")))
                 .andExpect(jsonPath("$.paths['/api/v1/support/execute'].post").exists())
-                .andExpect(jsonPath("$.paths['/api/v1/support/cases'].get").exists());
+                .andExpect(jsonPath("$.paths['/api/v1/support/cases'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/support/cases/queue'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/support/cases/{caseId}'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/v1/support/cases/{caseId}/applicant'].get").exists());
     }
 
     private void deliver(String body) throws Exception {

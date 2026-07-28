@@ -128,7 +128,7 @@ class ModuleApplicationTests {
                     .content(application("SIM-01")))
                 .andExpect(status().isAccepted());
 
-            mvc.perform(get("/api/v1/support/cases"))
+            mvc.perform(get("/api/v1/support/cases").param("q", "SIM-01"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.applicationId == 'SIM-01')].applicationId")
                     .value(hasItem("SIM-01")));

@@ -51,6 +51,25 @@ public class SupportCase {
     @Column(name = "sla_deadline")
     private Instant slaDeadline;
 
+    @Column(length = 128)
+    private String assignee;
+
+    @Column(name = "paused_minutes", nullable = false)
+    private int pausedMinutes;
+
+    @Column(nullable = false)
+    private boolean breached;
+
+    @Lob
+    @Column(name = "resolution_note", length = 65_535)
+    private String resolutionNote;
+
+    @Column(name = "resolved_at")
+    private Instant resolvedAt;
+
+    @Column(name = "closed_at")
+    private Instant closedAt;
+
     protected SupportCase() {
         // JPA
     }
@@ -71,6 +90,8 @@ public class SupportCase {
         this.channel = channel;
         this.status = "NEW";
         this.openedAt = openedAt;
+        this.pausedMinutes = 0;
+        this.breached = false;
     }
 
     public void price(String priority, Instant slaDeadline, int configVersion) {
@@ -124,5 +145,33 @@ public class SupportCase {
 
     public Instant getSlaDeadline() {
         return slaDeadline;
+    }
+
+    public String getAssignee() {
+        return assignee;
+    }
+
+    public int getPausedMinutes() {
+        return pausedMinutes;
+    }
+
+    public boolean isBreached() {
+        return breached;
+    }
+
+    public String getResolutionNote() {
+        return resolutionNote;
+    }
+
+    public Instant getResolvedAt() {
+        return resolvedAt;
+    }
+
+    public Instant getClosedAt() {
+        return closedAt;
+    }
+
+    public void markBreached(boolean breached) {
+        this.breached = breached;
     }
 }

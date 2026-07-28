@@ -75,6 +75,17 @@ export function DataTable({
                         rowTone?.(row) && `ds-table__row--${rowTone(row)}`
                       )}
                       onClick={clickable ? () => onRowClick(row, key) : undefined}
+                      tabIndex={clickable ? 0 : undefined}
+                      onKeyDown={
+                        clickable
+                          ? (event) => {
+                              if (event.key === 'Enter' || event.key === ' ') {
+                                event.preventDefault();
+                                onRowClick(row, key);
+                              }
+                            }
+                          : undefined
+                      }
                     >
                       {columns.map((col) => (
                         <td

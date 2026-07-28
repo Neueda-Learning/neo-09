@@ -15,8 +15,10 @@ import { caseStatusTone, priorityTone, time } from "../status.js";
 export default function CaseDetailScreen({
   caseId,
   onBack,
+  onRetry,
   error,
   applicantError,
+  applicantLoading,
   loading,
   detail,
   applicant,
@@ -65,7 +67,12 @@ export default function CaseDetailScreen({
           sidebar={
             <Card>
               <h3>Live applicant</h3>
-              {applicant ? (
+              {applicantLoading ? (
+                <div className="case-board-loading" aria-live="polite">
+                  <Spinner label="Loading applicant details" />
+                  <span>Loading live applicant details…</span>
+                </div>
+              ) : applicant ? (
                 <KeyValue
                   stacked
                   items={[
@@ -73,8 +80,8 @@ export default function CaseDetailScreen({
                     ["Product", applicant.product?.productCode ?? "—"],
                     [
                       "Delivery address",
-                      applicant.delivery?.address
-                        ? formatAddress(applicant.delivery.address)
+                      deliveryAddress(applicant)
+                        ? formatAddress(deliveryAddress(applicant))
                         : "—",
                     ],
                     ["Channel", applicant.channel ?? "—"],
@@ -83,9 +90,16 @@ export default function CaseDetailScreen({
               ) : (
                 <Alert
                   tone="warning"
-                  title="application not found — link may be stale"
+                  title={
+                    applicantError?.includes("not found")
+                      ? "application not found — link may be stale"
+                      : "Applicant details are temporarily unavailable"
+                  }
                 >
-                  {applicantError ?? "Retry to refresh the sidebar."}
+                  <p>{applicantError ?? "Retry to refresh the sidebar."}</p>
+                  <Button variant="secondary" size="sm" onClick={onRetry}>
+                    Retry applicant lookup
+                  </Button>
                 </Alert>
               )}
             </Card>
@@ -101,6 +115,7 @@ export default function CaseDetailScreen({
                   </Badge>,
                 ],
                 ["Category", detail.category],
+                ["Channel", detail.channel],
                 [
                   "Priority",
                   <Badge tone={priorityTone(detail.priority)}>
@@ -113,6 +128,10 @@ export default function CaseDetailScreen({
                 ],
                 ["Breached", detail.breached ? "Yes" : "No"],
                 ["Application", detail.applicationId],
+                ["Assignee", detail.assignee ?? "Unassigned"],
+                ["Opened", time(detail.openedAt)],
+                ["Paused", `${detail.pausedMinutes ?? 0} minutes`],
+                ["Description", detail.description],
               ]}
             />
           </Card>
@@ -136,4 +155,11 @@ function formatAddress(address) {
   ]
     .filter(Boolean)
     .join(", ");
+}
+
+function deliveryAddress(application) {
+  if (application.delivery?.useCurrentAddress) {
+    return application.applicant?.currentAddress;
+  }
+  return application.delivery?.address;
 }

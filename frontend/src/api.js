@@ -34,7 +34,11 @@ async function request(path, options = {}) {
 export const api = {
   health: () => request("/health"),
   info: () => request("/info"),
-  listCases: () => request("/api/v1/support/cases"),
+  searchCases: ({ query, status, limit = 10 }) => {
+    const params = new URLSearchParams({ q: query, limit: String(limit) });
+    if (status) params.set("status", status);
+    return request(`/api/v1/support/cases?${params}`);
+  },
   queue: () => request("/api/v1/support/cases/queue"),
   getCase: (caseId) => request(`/api/v1/support/cases/${caseId}`),
   getApplicant: (caseId) =>
