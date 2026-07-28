@@ -44,7 +44,7 @@ export default function CaseDetailScreen({
             ? `${detail.category} · ${detail.priority ?? "Pricing"} · ${detail.applicationId} · v${detail.configVersion ?? "—"}`
             : undefined
         }
-        action={
+        actions={
           <Button variant="ghost" size="sm" onClick={onBack}>
             Back to board
           </Button>
