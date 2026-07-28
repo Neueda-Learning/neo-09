@@ -6,10 +6,6 @@ backend/target/
 frontend/node_modules/
 frontend/dist/
 
-# Local browser-test artifacts
-output/playwright/
-.playwright-cli/
-
 # IDE
 .idea/
 *.iml
