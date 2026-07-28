@@ -12,3 +12,5 @@ databaseChangeLog:
       file: db/changelog/changes/004-use-json-types-for-case-config.yaml
   - include:
       file: db/changelog/changes/005-align-breached-boolean-type.yaml
+  - include:
+      file: db/changelog/changes/006-uc03-transition-columns.yaml

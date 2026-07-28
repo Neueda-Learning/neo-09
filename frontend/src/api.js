@@ -33,7 +33,7 @@ async function request(path, options = {}) {
 
 // This UI only ever READS. Applications arrive from the orchestrator — the real one, or the
 // sidecar playing it at http://localhost:9000 — never from a button in here. That is the
-// contrahttps://github.com/Neueda-Learning/neo-09/pull/5/conflict?name=frontend%252Fsrc%252Fapi.js&ancestor_oid=4ba861e90cd98b491a1b2663f8339bb1de432a79&base_oid=addd1915b956fd5b20156d0c889ed5ad305dfb4b&head_oid=4f193db7f8509e048527d0cdd852f1cc4d0c15c4ct: your module is called, it does not call itself.
+// contract: your module is called, it does not call itself.
 export const api = {
   health: () => request("/health"),
   info: () => request("/info"),
@@ -44,6 +44,11 @@ export const api = {
   },
   queue: () => request("/api/v1/support/cases/queue"),
   getCase: (caseId) => request(`/api/v1/support/cases/${caseId}`),
+  transitionCase: (caseId, payload) =>
+    request(`/api/v1/support/cases/${caseId}/transition`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   getApplicant: (caseId) =>
     request(`/api/v1/support/cases/${caseId}/applicant`),
   listApplications: () => request("/api/v1/applications"),

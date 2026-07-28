@@ -8,6 +8,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.UUID;
@@ -28,6 +29,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.neobank.module.integrations.orchestrator.Application;
 import com.neobank.module.integrations.orchestrator.OrchestratorClient;
+import com.neobank.module.model.Decision;
 import com.neobank.module.support.api.SupportCaseDetailView;
 import com.neobank.module.support.api.SupportCaseEventView;
 import com.neobank.module.support.api.SupportCaseQueueResponse;
@@ -45,8 +47,11 @@ public class SupportCaseService {
 
     private static final Logger log = LoggerFactory.getLogger(SupportCaseService.class);
     private static final TypeReference<Set<String>> CATEGORY_SET = new TypeReference<>() { };
+    private static final TypeReference<Map<String, Integer>> SLA_MAP = new TypeReference<>() { };
     private static final Set<String> CASE_STATUSES =
             Set.of("NEW", "OPEN", "PENDING_CUSTOMER", "RESOLVED", "CLOSED");
+    private static final Set<String> ACTIONS =
+            Set.of("PICK_UP", "WAIT_CUSTOMER", "RESUME", "RESOLVE", "CLOSE", "REOPEN");
     private static final String NO_APPLICATION_MATCH = "__no_application_match__";
 
     private final Executor executor;
@@ -184,9 +189,9 @@ public class SupportCaseService {
         List<SupportCaseQueueRow> visibleCases = allOpenCases.stream()
                 .limit(10)
                 .toList();
-        int breached = (int) allOpenCases.stream()
+        int breached = Math.toIntExact(allOpenCases.stream()
                 .filter(SupportCaseQueueRow::breached)
-                .count();
+            .count());
 
         return new SupportCaseQueueResponse(allOpenCases.size(), breached, visibleCases);
     }
@@ -232,6 +237,70 @@ public class SupportCaseService {
         }
     }
 
+    @Transactional
+    public SupportCaseDetailView transition(String caseId, String action, String actor, String note) {
+        String normalizedAction = action == null ? "" : action.trim().toUpperCase();
+        String normalizedActor = actor == null ? "" : actor.trim();
+        String normalizedNote = note == null ? null : note.trim();
+
+        if (!ACTIONS.contains(normalizedAction)) {
+            throw new IllegalArgumentException("unknown transition action: " + action);
+        }
+        if (normalizedActor.isBlank()) {
+            throw new IllegalArgumentException("actor is required");
+        }
+
+        SupportCase supportCase = supportCases.findByCaseId(caseId)
+                .orElseThrow(() -> new NoSuchElementException("case not found: " + caseId));
+        Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
+        String fromStatus = supportCase.getStatus();
+
+        if ("CLOSED".equals(fromStatus)) {
+            throw conflict("illegal transition from CLOSED");
+        }
+
+        switch (normalizedAction) {
+            case "PICK_UP" -> requireStatus(supportCase, "NEW");
+            case "WAIT_CUSTOMER" -> requireStatus(supportCase, "OPEN");
+            case "RESUME" -> requireStatus(supportCase, "PENDING_CUSTOMER");
+            case "RESOLVE" -> requireStatus(supportCase, "OPEN");
+            case "CLOSE" -> requireStatus(supportCase, "RESOLVED");
+            case "REOPEN" -> requireStatus(supportCase, "RESOLVED");
+            default -> throw new IllegalArgumentException("unknown transition action: " + action);
+        }
+
+        switch (normalizedAction) {
+            case "PICK_UP" -> supportCase.pickUp(normalizedActor);
+            case "WAIT_CUSTOMER" -> supportCase.waitCustomer(now);
+            case "RESUME" -> supportCase.resume(now);
+            case "RESOLVE" -> {
+                if (normalizedNote == null || normalizedNote.isBlank()) {
+                    throw new IllegalArgumentException("note is required for RESOLVE");
+                }
+                supportCase.resolve(normalizedNote, now);
+                triggerFirstCallbackIfNeeded(supportCase, normalizedNote, now);
+            }
+            case "CLOSE" -> supportCase.close(now);
+            case "REOPEN" -> {
+                validateReopenWindow(supportCase, now);
+                supportCase.reopen(freshDeadlineFromReopen(supportCase, now));
+            }
+            default -> throw new IllegalArgumentException("unknown transition action: " + action);
+        }
+
+        caseEvents.save(CaseEvent.transition(
+                supportCase.getCaseId(),
+                normalizedAction,
+                fromStatus,
+                supportCase.getStatus(),
+                normalizedActor,
+                normalizedNote,
+                now));
+        supportCases.save(supportCase);
+
+        return getCase(supportCase.getCaseId());
+    }
+
     private void validateCategory(String category, CaseConfig config) {
         try {
             Set<String> categories =
@@ -243,6 +312,65 @@ public class SupportCaseService {
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("current category configuration is invalid", ex);
         }
+    }
+
+    private void triggerFirstCallbackIfNeeded(SupportCase supportCase, String note, Instant now) {
+        if (supportCase.isCallbackSent()) {
+            return;
+        }
+
+        String comment = "SUP_RESOLVED" + (note == null || note.isBlank() ? "" : (": " + note));
+        orchestrator.applicationStatusUpdate(
+                supportCase.getApplicationId(),
+                Decision.ACCEPTED,
+                comment);
+        supportCase.markCallbackSent();
+        caseEvents.save(CaseEvent.callbackSent(supportCase.getCaseId(), comment, now));
+    }
+
+    private void validateReopenWindow(SupportCase supportCase, Instant now) {
+        Instant resolvedAt = supportCase.getResolvedAt();
+        if (resolvedAt == null) {
+            throw conflict("cannot reopen case without resolvedAt");
+        }
+        if (resolvedAt.plus(7, ChronoUnit.DAYS).isBefore(now)) {
+            throw conflict("reopen window expired");
+        }
+    }
+
+    private Instant freshDeadlineFromReopen(SupportCase supportCase, Instant now) {
+        Integer configVersion = supportCase.getConfigVersion();
+        String priority = supportCase.getPriority();
+        if (configVersion == null || priority == null) {
+            return supportCase.getSlaDeadline();
+        }
+
+        CaseConfig config = configs.findById(configVersion)
+                .orElseGet(() -> configs.findTopByOrderByVersionDesc().orElse(null));
+        if (config == null) {
+            return supportCase.getSlaDeadline();
+        }
+
+        try {
+            Map<String, Integer> slaHours = objectMapper.readValue(config.getSlaHoursJson(), SLA_MAP);
+            Integer hours = slaHours.get(priority);
+            if (hours == null) {
+                return supportCase.getSlaDeadline();
+            }
+            return now.plus(hours, ChronoUnit.HOURS);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("stored sla_hours_json is invalid", ex);
+        }
+    }
+
+    private void requireStatus(SupportCase supportCase, String expected) {
+        if (!expected.equals(supportCase.getStatus())) {
+            throw conflict("illegal transition from " + supportCase.getStatus());
+        }
+    }
+
+    private IllegalCaseTransitionException conflict(String message) {
+        return new IllegalCaseTransitionException(message);
     }
 
     private String caseId(String correlationId) {

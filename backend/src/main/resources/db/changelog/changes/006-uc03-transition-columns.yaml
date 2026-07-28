@@ -1,0 +1,30 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-uc03-transition-columns
+      author: neo-09
+      changes:
+        - addColumn:
+            tableName: support_case
+            columns:
+              - column:
+                  name: paused_since
+                  type: TIMESTAMP
+        - addColumn:
+            tableName: case_event
+            columns:
+              - column:
+                  name: from_status
+                  type: VARCHAR(32)
+              - column:
+                  name: to_status
+                  type: VARCHAR(32)
+      rollback:
+        - dropColumn:
+            tableName: case_event
+            columnName: to_status
+        - dropColumn:
+            tableName: case_event
+            columnName: from_status
+        - dropColumn:
+            tableName: support_case
+            columnName: paused_since
