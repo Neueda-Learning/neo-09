@@ -25,6 +25,7 @@ export default function CaseDetailScreen({
   loading,
   detail,
   applicant,
+  onViewConfig,
 }) {
   const [action, setAction] = useState("PICK_UP");
   const [actor, setActor] = useState("a.khan");
@@ -89,9 +90,19 @@ export default function CaseDetailScreen({
             : undefined
         }
         actions={
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            Back to board
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={detail?.configVersion == null}
+              onClick={() => onViewConfig?.(detail.configVersion)}
+            >
+              View config v{detail?.configVersion ?? "—"}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onBack}>
+              Back to board
+            </Button>
+          </>
         }
       />
 

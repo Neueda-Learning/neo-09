@@ -7,6 +7,7 @@ import {
   StatusPill,
 } from "./design-system";
 import CaseBoardScreen from "./components/CaseBoardScreen.jsx";
+import CaseConfigScreen from "./components/CaseConfigScreen.jsx";
 import CaseDetailScreen from "./components/CaseDetailScreen.jsx";
 import { api } from "./api.js";
 
@@ -16,6 +17,7 @@ const HEALTH_MS = 10000;
 const SCREENS = [
   { id: "cases", label: "Cases" },
   { id: "detail", label: "Detail" },
+  { id: "config", label: "Configuration" },
 ];
 
 /**
@@ -31,6 +33,7 @@ export default function App() {
   const [searchError, setSearchError] = useState(null);
   const [applicantNames, setApplicantNames] = useState({});
   const [selectedCaseId, setSelectedCaseId] = useState(null);
+  const [configVersion, setConfigVersion] = useState(null);
   const [detail, setDetail] = useState(null);
   const [applicant, setApplicant] = useState(null);
   const [applicantLoading, setApplicantLoading] = useState(false);
@@ -85,6 +88,11 @@ export default function App() {
       setDetailLoading(false);
     }
   }, [loadApplicant]);
+
+  const openConfig = useCallback((version = null) => {
+    setConfigVersion(version);
+    setScreen("config");
+  }, []);
 
   useEffect(() => {
     const normalized = query.trim();
@@ -216,6 +224,7 @@ export default function App() {
             items={SCREENS}
             active={screen}
             onSelect={(nextScreen) => {
+              if (nextScreen === "config") setConfigVersion(null);
               setScreen(nextScreen);
             }}
           />
@@ -269,7 +278,11 @@ export default function App() {
           loading={detailLoading}
           detail={detail}
           applicant={applicant}
+          onViewConfig={openConfig}
         />
+      )}
+      {screen === "config" && (
+        <CaseConfigScreen info={info} initialVersion={configVersion} />
       )}
     </AppShell>
   );
