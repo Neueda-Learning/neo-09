@@ -1,0 +1,21 @@
+{
+  "name": "neo-09-customer-support",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --mode customer-local",
+    "dev:local": "vite --mode customer-local",
+    "dev:dev": "vite --mode customer-dev",
+    "dev:prod": "vite --mode customer-prod",
+    "build": "vite build --mode customer-local",
+    "build:dev": "vite build --mode customer-dev",
+    "build:prod": "vite build --mode customer-prod"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.8",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
