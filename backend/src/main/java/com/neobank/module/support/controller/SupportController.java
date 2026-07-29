@@ -16,6 +16,7 @@ import com.neobank.module.support.api.OpenCaseAcknowledgement;
 import com.neobank.module.support.api.OpenCaseRequest;
 import com.neobank.module.support.api.CaseSupervisorRequest;
 import com.neobank.module.support.api.CaseTransitionRequest;
+import com.neobank.module.support.api.CsatSubmissionRequest;
 import com.neobank.module.support.api.SlaBoardResponse;
 import com.neobank.module.support.api.SupportCaseDetailView;
 import com.neobank.module.support.api.SupportCaseQueueResponse;
@@ -87,6 +88,13 @@ public class SupportController {
                 request.reason(),
                 request.supervisor(),
                 request.assignee());
+    }
+
+    @PostMapping("/cases/{caseId}/csat")
+    public SupportCaseDetailView recordCsat(
+            @PathVariable String caseId,
+            @Valid @RequestBody CsatSubmissionRequest request) {
+        return supportCases.recordCsat(caseId, request.score(), request.comment());
     }
 
     @GetMapping("/cases/{caseId}/applicant")

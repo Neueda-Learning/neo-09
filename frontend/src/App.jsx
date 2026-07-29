@@ -50,6 +50,8 @@ export default function App() {
   const [transitionLoading, setTransitionLoading] = useState(false);
   const [supervisorError, setSupervisorError] = useState(null);
   const [supervisorLoading, setSupervisorLoading] = useState(false);
+  const [csatError, setCsatError] = useState(null);
+  const [csatLoading, setCsatLoading] = useState(false);
   const [applicantError, setApplicantError] = useState(null);
   const [health, setHealth] = useState(null);
   const [info, setInfo] = useState(null);
@@ -96,6 +98,7 @@ export default function App() {
     setDetailError(null);
     setTransitionError(null);
     setSupervisorError(null);
+    setCsatError(null);
     setApplicant(null);
     loadApplicant(caseId);
     try {
@@ -259,6 +262,29 @@ export default function App() {
     [reload, selectedCaseId],
   );
 
+  const recordCsat = useCallback(
+    async ({ score, comment }) => {
+      if (!selectedCaseId) return false;
+      setCsatLoading(true);
+      setCsatError(null);
+      try {
+        const updated = await api.recordCsat(selectedCaseId, {
+          score,
+          comment,
+        });
+        setDetail(updated);
+        await reloadSla();
+        return true;
+      } catch (failure) {
+        setCsatError(failure.message);
+        return false;
+      } finally {
+        setCsatLoading(false);
+      }
+    },
+    [reloadSla, selectedCaseId],
+  );
+
   return (
     <AppShell
       side={
@@ -333,6 +359,9 @@ export default function App() {
           supervisorError={supervisorError}
           supervisorLoading={supervisorLoading}
           onSupervisor={superviseCase}
+          csatError={csatError}
+          csatLoading={csatLoading}
+          onRecordCsat={recordCsat}
           applicantError={applicantError}
           applicantLoading={applicantLoading}
           loading={detailLoading}

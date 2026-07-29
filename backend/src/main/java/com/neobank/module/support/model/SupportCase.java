@@ -10,6 +10,8 @@ import jakarta.persistence.Table;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "support_case")
@@ -77,6 +79,14 @@ public class SupportCase {
 
     @Column(name = "callback_sent", nullable = false)
     private boolean callbackSent;
+
+    @Column(name = "csat_score")
+    @JdbcTypeCode(SqlTypes.TINYINT)
+    private Integer csatScore;
+
+    @Lob
+    @Column(name = "csat_comment", length = 65_535)
+    private String csatComment;
 
     protected SupportCase() {
         // JPA
@@ -197,6 +207,14 @@ public class SupportCase {
         return callbackSent;
     }
 
+    public Integer getCsatScore() {
+        return csatScore;
+    }
+
+    public String getCsatComment() {
+        return csatComment;
+    }
+
     public void markBreached(boolean breached) {
         this.breached = breached;
     }
@@ -249,6 +267,11 @@ public class SupportCase {
 
     public void markCallbackSent() {
         this.callbackSent = true;
+    }
+
+    public void recordCsat(int score, String comment) {
+        this.csatScore = score;
+        this.csatComment = comment;
     }
 
     private static long pausedMinutesBetween(Instant from, Instant to) {

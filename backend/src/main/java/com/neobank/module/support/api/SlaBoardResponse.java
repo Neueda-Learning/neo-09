@@ -10,5 +10,6 @@ import java.util.List;
 public record SlaBoardResponse(
         Instant referenceNow,
         List<SlaPriorityCount> byPriority,
-        List<SlaBreachedCaseView> breachedCases) {
+        List<SlaBreachedCaseView> breachedCases,
+        List<SlaCategoryCsat> csatByCategory) {
 }

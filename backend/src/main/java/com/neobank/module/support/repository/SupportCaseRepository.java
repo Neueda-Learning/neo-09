@@ -30,6 +30,14 @@ public interface SupportCaseRepository extends JpaRepository<SupportCase, Long> 
 
     List<SupportCase> findAllByOrderByOpenedAtDescIdDesc(Pageable pageable);
 
+    @Query("""
+            select supportCase.category as category, avg(supportCase.csatScore) as averageScore
+            from SupportCase supportCase
+            where supportCase.status = 'CLOSED'
+            group by supportCase.category
+            """)
+    List<CategoryCsatAverage> findClosedCsatAverages();
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select supportCase
