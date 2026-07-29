@@ -30,6 +30,7 @@ export function SideNav({ items = [], active, onSelect, label = 'Screens', class
         const id = typeof item === 'string' ? item : item.id;
         const text = typeof item === 'string' ? item : item.label;
         const hint = typeof item === 'string' ? undefined : item.hint;
+        const icon = typeof item === 'string' ? undefined : item.icon;
         const disabled = typeof item === 'string' ? false : Boolean(item.disabled);
         return (
           <button
@@ -40,8 +41,11 @@ export function SideNav({ items = [], active, onSelect, label = 'Screens', class
             aria-current={active === id ? 'page' : undefined}
             onClick={() => onSelect?.(id)}
           >
-            <span className="ds-side__label">{text}</span>
-            {hint != null && <span className="ds-side__hint">{hint}</span>}
+            {icon != null && <span className="ds-side__icon" aria-hidden="true">{icon}</span>}
+            <span className="ds-side__copy">
+              <span className="ds-side__label">{text}</span>
+              {hint != null && <span className="ds-side__hint">{hint}</span>}
+            </span>
           </button>
         );
       })}

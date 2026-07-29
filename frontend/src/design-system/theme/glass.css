@@ -1,80 +1,73 @@
-/* ============================================================================
- * Operations Console theme
- *
- * The filename is retained to avoid changing the public design-system import,
- * but the visual language is deliberately no longer glass. This is a dense,
- * sober enterprise-finance workspace: flat surfaces, precise borders, restrained
- * elevation, accessible status colours, and one red product accent.
- * ==========================================================================*/
+/* NEO 09 support ledger — emerald navigation, parchment data surfaces and
+ * deep aubergine ink. The filename stays stable for the public import. */
 
 :root,
 [data-ds-theme='glass'] {
-  --ds-font-sans: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    Helvetica, Arial, sans-serif;
+  --ds-font-sans: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --ds-font-display: var(--ds-font-sans);
   --ds-font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas,
     'Liberation Mono', monospace;
   --ds-figure-family: var(--ds-font-sans);
-  --ds-figure-weight: 650;
-  --ds-display-weight: 650;
+  --ds-figure-weight: 600;
+  --ds-display-weight: 600;
 
   --ds-ground-image: none;
   --ds-ground-grain: none;
   --ds-ground-grain-overlay-opacity: 0;
   --ds-ground-grain-softlight-opacity: 0;
-  --ds-ground-fallback: #f3f5f8;
+  --ds-ground-fallback: #f6efe3;
 
-  --ds-color-canvas: #f3f5f8;
+  --ds-color-canvas: #f6efe3;
   --ds-color-surface: #ffffff;
-  --ds-color-surface-sunken: #f7f8fa;
-  --ds-color-surface-hover: #f0f3f7;
-  --ds-color-surface-active: #e7ebf1;
+  --ds-color-surface-sunken: #fbf8f2;
+  --ds-color-surface-hover: #f7f1e7;
+  --ds-color-surface-active: #efe5d5;
 
   --ds-surface-fill: #ffffff;
   --ds-surface-backdrop: none;
-  --ds-surface-border: 1px solid #d9dee7;
-  --ds-surface-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --ds-surface-border: 1px solid #ece5da;
+  --ds-surface-shadow: 0 12px 34px rgba(63, 61, 86, 0.06);
   --ds-control-fill: #ffffff;
-  --ds-control-fill-hover: #ffffff;
+  --ds-control-fill-hover: #fbf8f2;
 
-  --ds-color-ink-solid: #111b2e;
-  --ds-color-nav: #111b2e;
+  --ds-color-ink-solid: #3f3d56;
+  --ds-color-nav: #348f6c;
   --ds-color-nav-ink: #ffffff;
-  --ds-color-nav-ink-muted: #aeb8c8;
-  --ds-color-nav-hover: rgba(255, 255, 255, 0.08);
-  --ds-color-nav-selected: rgba(255, 255, 255, 0.1);
-  --ds-color-nav-divider: rgba(255, 255, 255, 0.12);
+  --ds-color-nav-ink-muted: #e2c992;
+  --ds-color-nav-hover: rgba(255, 255, 255, 0.1);
+  --ds-color-nav-selected: #ffffff;
+  --ds-color-nav-divider: rgba(226, 201, 146, 0.38);
 
-  --ds-color-border: #cfd6e0;
-  --ds-color-border-subtle: #e7eaf0;
-  --ds-color-border-strong: #909bad;
-  --ds-color-table-head: #f2f4f7;
-  --ds-color-breach-row: #fffafb;
+  --ds-color-border: #ddd6ca;
+  --ds-color-border-subtle: #eee8de;
+  --ds-color-border-strong: #c0c0c0;
+  --ds-color-table-head: #fbf8f2;
+  --ds-color-breach-row: #fff9f6;
 
-  --ds-color-text: #172033;
-  --ds-color-text-secondary: #3d485a;
-  --ds-color-text-muted: #657185;
+  --ds-color-text: #3f3d56;
+  --ds-color-text-secondary: #57546b;
+  --ds-color-text-muted: #817e8e;
   --ds-color-text-inverse: #ffffff;
 
-  --ds-color-accent: #d71920;
-  --ds-color-accent-hover: #b8141b;
-  --ds-color-accent-press: #971117;
-  --ds-color-accent-soft: #fdebed;
+  --ds-color-accent: #348f6c;
+  --ds-color-accent-hover: #2b795b;
+  --ds-color-accent-press: #23654c;
+  --ds-color-accent-soft: #e8f3ee;
   --ds-color-accent-ink: #ffffff;
-  --ds-color-accent-text: #a81017;
-  --ds-color-focus: #2563a6;
+  --ds-color-accent-text: #23654c;
+  --ds-color-focus: #a97f28;
 
   --ds-tone-positive-surface: #e9f5ef;
-  --ds-tone-positive-border: #a6d4ba;
-  --ds-tone-positive-text: #17613a;
-  --ds-tone-positive-ink: #17613a;
-  --ds-tone-positive-accent: #248451;
+  --ds-tone-positive-border: #9dceb8;
+  --ds-tone-positive-text: #246c51;
+  --ds-tone-positive-ink: #246c51;
+  --ds-tone-positive-accent: #348f6c;
 
-  --ds-tone-warning-surface: #fff3d6;
-  --ds-tone-warning-border: #e9c46a;
-  --ds-tone-warning-text: #704f00;
-  --ds-tone-warning-ink: #704f00;
-  --ds-tone-warning-accent: #b77900;
+  --ds-tone-warning-surface: #fbf3df;
+  --ds-tone-warning-border: #e2c992;
+  --ds-tone-warning-text: #715b27;
+  --ds-tone-warning-ink: #715b27;
+  --ds-tone-warning-accent: #b7974f;
 
   --ds-tone-negative-surface: #fdebec;
   --ds-tone-negative-border: #e3a4a8;
@@ -82,34 +75,34 @@
   --ds-tone-negative-ink: #9d1119;
   --ds-tone-negative-accent: #c41e27;
 
-  --ds-tone-info-surface: #e8f1fb;
-  --ds-tone-info-border: #a9c8ea;
-  --ds-tone-info-text: #174f84;
-  --ds-tone-info-ink: #174f84;
-  --ds-tone-info-accent: #347bbd;
+  --ds-tone-info-surface: #efedf4;
+  --ds-tone-info-border: #c8c3d8;
+  --ds-tone-info-text: #514d70;
+  --ds-tone-info-ink: #514d70;
+  --ds-tone-info-accent: #6d678d;
 
-  --ds-tone-neutral-surface: #eef1f5;
-  --ds-tone-neutral-border: #cfd6e0;
-  --ds-tone-neutral-text: #465266;
-  --ds-tone-neutral-ink: #465266;
-  --ds-tone-neutral-accent: #7b8798;
+  --ds-tone-neutral-surface: #f3f1ed;
+  --ds-tone-neutral-border: #c0c0c0;
+  --ds-tone-neutral-text: #5e5b68;
+  --ds-tone-neutral-ink: #5e5b68;
+  --ds-tone-neutral-accent: #8f8d96;
 
-  --ds-series-1: #1f5d94;
-  --ds-series-2: #248451;
-  --ds-series-3: #b77900;
+  --ds-series-1: #348f6c;
+  --ds-series-2: #e2c992;
+  --ds-series-3: #3f3d56;
   --ds-series-4: #c41e27;
-  --ds-series-5: #7b8798;
-  --ds-series-track: #e7eaf0;
+  --ds-series-5: #c0c0c0;
+  --ds-series-track: #eee8de;
 
-  --ds-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
-  --ds-shadow-md: 0 6px 18px rgba(16, 24, 40, 0.09);
-  --ds-shadow-overlay: 0 18px 40px rgba(16, 24, 40, 0.2);
-  --ds-scrim: rgba(15, 23, 42, 0.52);
+  --ds-shadow-sm: 0 2px 8px rgba(63, 61, 86, 0.05);
+  --ds-shadow-md: 0 18px 44px rgba(63, 61, 86, 0.1);
+  --ds-shadow-overlay: 0 22px 54px rgba(63, 61, 86, 0.2);
+  --ds-scrim: rgba(63, 61, 86, 0.5);
 
-  --ds-radius-sm: 3px;
-  --ds-radius-md: 5px;
-  --ds-radius-lg: 8px;
-  --ds-radius-xl: 10px;
+  --ds-radius-sm: 6px;
+  --ds-radius-md: 10px;
+  --ds-radius-lg: 16px;
+  --ds-radius-xl: 24px;
 
-  --ds-team-support: #d71920;
+  --ds-team-support: #348f6c;
 }
