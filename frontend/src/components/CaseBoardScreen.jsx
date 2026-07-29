@@ -35,7 +35,7 @@ export default function CaseBoardScreen({
   info,
   onOpenCase,
 }) {
-  const searching = Boolean(query.trim());
+  const searching = Boolean(query.trim() || searchStatus);
   const rows = searching ? searchResults : (queue?.cases ?? []);
 
   const counts = useMemo(
@@ -175,8 +175,7 @@ export default function CaseBoardScreen({
             size="sm"
             value={searchStatus}
             onChange={(event) => onSearchStatusChange(event.target.value)}
-            disabled={!searching}
-            aria-label="Filter search results by status"
+            aria-label="Filter support cases by status"
             options={[
               { value: "", label: "All statuses" },
               "NEW",
@@ -201,11 +200,13 @@ export default function CaseBoardScreen({
       </Toolbar>
 
       <div className="case-search-guidance" aria-live="polite">
-        {searching && query.trim().length < 3
+        {query.trim() && query.trim().length < 3
           ? "Short searches can be broad. Add more characters for a more precise result."
           : searching && searchResults.length === 10
             ? "10 results shown, the search limit. Refine the case ID, application ID or customer name to narrow the list."
-            : "Search accepts case ID, application ID or customer name. Clear the search to return to the priority queue."}
+            : searchStatus && !query.trim()
+              ? `Showing the newest ${searchStatus} cases. Add a search term to narrow the results.`
+              : "Search accepts a continuous case ID, application ID or customer-name match. Status can be used on its own."}
       </div>
 
       {loading || searchLoading ? (
@@ -258,8 +259,8 @@ export default function CaseBoardScreen({
                 </>
               ) : (
                 <>
-                  No matching case was found. Try a more precise case ID,
-                  application ID, or a different customer name.
+                  No matching case was found. Try another status or a continuous
+                  case ID, application ID, or customer-name fragment.
                 </>
               )}
             </EmptyState>

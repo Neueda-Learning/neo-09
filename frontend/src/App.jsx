@@ -273,7 +273,7 @@ export default function App() {
 
   useEffect(() => {
     const normalized = query.trim();
-    if (!normalized) {
+    if (!normalized && !searchStatus) {
       setSearchResults([]);
       setSearchError(null);
       setSearchLoading(false);
@@ -285,7 +285,7 @@ export default function App() {
       setSearchLoading(true);
       try {
         const matches = await api.searchCases({
-          query: normalized,
+          query: normalized || undefined,
           status: searchStatus || undefined,
           limit: 10,
         });
@@ -309,7 +309,8 @@ export default function App() {
     };
   }, [query, searchStatus]);
 
-  const visibleCases = query.trim() ? searchResults : queue.cases;
+  const filteringCases = Boolean(query.trim() || searchStatus);
+  const visibleCases = filteringCases ? searchResults : queue.cases;
   const visibleCaseKey = visibleCases
     .map((supportCase) => `${supportCase.caseId}:${supportCase.applicationId}`)
     .join("|");

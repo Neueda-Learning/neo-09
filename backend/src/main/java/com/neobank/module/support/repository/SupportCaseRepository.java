@@ -43,7 +43,7 @@ public interface SupportCaseRepository extends JpaRepository<SupportCase, Long> 
             select supportCase
             from SupportCase supportCase
             where (:status is null or supportCase.status = :status)
-              and (
+              and (:query = '' or
                 lower(supportCase.caseId) like lower(concat('%', :query, '%'))
                 or lower(supportCase.applicationId) like lower(concat('%', :query, '%'))
                 or supportCase.applicationId in :applicationIds

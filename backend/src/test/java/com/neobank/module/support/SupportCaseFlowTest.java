@@ -224,6 +224,27 @@ class SupportCaseFlowTest {
     }
 
     @Test
+    void searchRequiresTheCompleteQueryAndStatusWorksWithoutAQuery() throws Exception {
+        deliver(valid("corr-strict-search", "CARD_NOT_ARRIVED", "Card not here"));
+
+        when(orchestrator.applicationsByName("24"))
+                .thenReturn(List.of(applicantApplication()));
+        mvc.perform(get("/api/v1/support/cases")
+                        .param("q", "24")
+                        .param("limit", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+
+        mvc.perform(get("/api/v1/support/cases")
+                        .param("status", "NEW")
+                        .param("limit", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].applicationId").value("app-1001"))
+                .andExpect(jsonPath("$[0].status").value("NEW"));
+        verify(orchestrator).applicationsByName("24");
+    }
+
+    @Test
     void searchIsCappedAtTenAndRejectsAnOversizedLimit() throws Exception {
         for (int index = 0; index < 11; index++) {
             deliver(valid("corr-cap-" + index, "OTHER", "Case " + index));

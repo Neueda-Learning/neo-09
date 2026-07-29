@@ -154,9 +154,6 @@ public class SupportCaseService {
     @Transactional
     public List<SupportCaseView> searchCases(String query, String status, int limit) {
         String normalizedQuery = query == null ? "" : query.trim();
-        if (normalizedQuery.isEmpty()) {
-            return List.of();
-        }
         if (limit < 1 || limit > 10) {
             throw new IllegalArgumentException("limit must be between 1 and 10");
         }
@@ -166,17 +163,25 @@ public class SupportCaseService {
         if (normalizedStatus != null && !CASE_STATUSES.contains(normalizedStatus)) {
             throw new IllegalArgumentException("unknown case status: " + status);
         }
+        if (normalizedQuery.isEmpty() && normalizedStatus == null) {
+            return List.of();
+        }
 
         LinkedHashSet<String> applicationIds = new LinkedHashSet<>();
         applicationIds.add(NO_APPLICATION_MATCH);
-        try {
-            orchestrator.applicationsByName(normalizedQuery).stream()
-                    .map(Application::applicationId)
-                    .filter(applicationId -> applicationId != null && !applicationId.isBlank())
-                    .forEach(applicationIds::add);
-        } catch (RestClientException ex) {
-            log.warn("Applicant name search unavailable for '{}': {}",
-                    normalizedQuery, ex.toString());
+        if (!normalizedQuery.isEmpty()) {
+            try {
+                orchestrator.applicationsByName(normalizedQuery).stream()
+                        // The orchestrator may search names by separate tokens. The support
+                        // search contract is stricter: the complete query must occur contiguously.
+                        .filter(application -> applicantNameContains(application, normalizedQuery))
+                        .map(Application::applicationId)
+                        .filter(applicationId -> applicationId != null && !applicationId.isBlank())
+                        .forEach(applicationIds::add);
+            } catch (RestClientException ex) {
+                log.warn("Applicant name search unavailable for '{}': {}",
+                        normalizedQuery, ex.toString());
+            }
         }
 
         Instant now = clock.instant();
@@ -191,6 +196,14 @@ public class SupportCaseService {
                     return SupportCaseView.of(supportCase, refreshBreached(supportCase, now));
                 })
                 .toList();
+    }
+
+    private boolean applicantNameContains(Application application, String query) {
+        return application != null
+                && application.applicant() != null
+                && application.applicant().fullName() != null
+                && normalizeSearchText(application.applicant().fullName())
+                        .contains(normalizeSearchText(query));
     }
 
     @Transactional

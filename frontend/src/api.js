@@ -38,7 +38,8 @@ export const api = {
   health: () => request("/health"),
   info: () => request("/info"),
   searchCases: ({ query, status, limit = 10 }) => {
-    const params = new URLSearchParams({ q: query, limit: String(limit) });
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (query) params.set("q", query);
     if (status) params.set("status", status);
     return request(`/api/v1/support/cases?${params}`);
   },
