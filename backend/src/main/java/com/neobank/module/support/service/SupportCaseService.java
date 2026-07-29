@@ -52,6 +52,8 @@ public class SupportCaseService {
             Set.of("NEW", "OPEN", "PENDING_CUSTOMER", "RESOLVED", "CLOSED");
     private static final Set<String> ACTIONS =
             Set.of("PICK_UP", "WAIT_CUSTOMER", "RESUME", "RESOLVE", "CLOSE", "REOPEN");
+        private static final Set<String> SUPERVISOR_ACTIONS =
+            Set.of("FORCE_CLOSE", "REASSIGN");
     private static final String NO_APPLICATION_MATCH = "__no_application_match__";
 
     private final Executor executor;
@@ -301,6 +303,74 @@ public class SupportCaseService {
         return getCase(supportCase.getCaseId());
     }
 
+    @Transactional
+    public SupportCaseDetailView supervisorAction(
+            String caseId,
+            String action,
+            String reason,
+            String supervisor,
+            String assignee) {
+        String normalizedAction = action == null ? "" : action.trim().toUpperCase();
+        String normalizedReason = reason == null ? "" : reason.trim();
+        String normalizedSupervisor = supervisor == null ? "" : supervisor.trim();
+        String normalizedAssignee = assignee == null ? "" : assignee.trim();
+
+        if (!SUPERVISOR_ACTIONS.contains(normalizedAction)) {
+            throw new IllegalArgumentException("unknown supervisor action: " + action);
+        }
+        if (normalizedReason.isBlank()) {
+            throw new IllegalArgumentException("reason is required");
+        }
+        if (normalizedSupervisor.isBlank()) {
+            throw new IllegalArgumentException("supervisor is required");
+        }
+
+        SupportCase supportCase = supportCases.findByCaseId(caseId)
+                .orElseThrow(() -> new NoSuchElementException("case not found: " + caseId));
+        String fromStatus = supportCase.getStatus();
+        Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
+
+        if ("CLOSED".equals(fromStatus)) {
+            throw conflict("closed is closed");
+        }
+
+        switch (normalizedAction) {
+            case "FORCE_CLOSE" -> {
+                supportCase.close(now);
+                caseEvents.save(CaseEvent.transition(
+                        supportCase.getCaseId(),
+                        "SUPERVISOR_FORCE_CLOSED",
+                        fromStatus,
+                        "CLOSED",
+                        normalizedSupervisor,
+                        normalizedReason,
+                        now));
+                triggerSupervisorClosureCallbackIfNeeded(supportCase, normalizedReason, now);
+            }
+            case "REASSIGN" -> {
+                if (!Set.of("NEW", "OPEN", "PENDING_CUSTOMER").contains(fromStatus)) {
+                    throw conflict("illegal supervisor reassign from " + fromStatus);
+                }
+                if (normalizedAssignee.isBlank()) {
+                    throw new IllegalArgumentException("assignee is required for REASSIGN");
+                }
+                supportCase.reassign(normalizedAssignee);
+                caseEvents.save(CaseEvent.transition(
+                        supportCase.getCaseId(),
+                        "SUPERVISOR_REASSIGNED",
+                        null,
+                        null,
+                        normalizedSupervisor,
+                        normalizedReason,
+                        now));
+            }
+            default -> throw new IllegalArgumentException("unknown supervisor action: " + action);
+        }
+
+        supportCases.save(supportCase);
+        return getCase(supportCase.getCaseId());
+    }
+
     private void validateCategory(String category, CaseConfig config) {
         try {
             Set<String> categories =
@@ -320,6 +390,23 @@ public class SupportCaseService {
         }
 
         String comment = "SUP_RESOLVED" + (note == null || note.isBlank() ? "" : (": " + note));
+        orchestrator.applicationStatusUpdate(
+                supportCase.getApplicationId(),
+                Decision.ACCEPTED,
+                comment);
+        supportCase.markCallbackSent();
+        caseEvents.save(CaseEvent.callbackSent(supportCase.getCaseId(), comment, now));
+    }
+
+    private void triggerSupervisorClosureCallbackIfNeeded(
+            SupportCase supportCase,
+            String reason,
+            Instant now) {
+        if (supportCase.isCallbackSent()) {
+            return;
+        }
+
+        String comment = "SUP_CLOSED_UNRESOLVED: " + reason;
         orchestrator.applicationStatusUpdate(
                 supportCase.getApplicationId(),
                 Decision.ACCEPTED,

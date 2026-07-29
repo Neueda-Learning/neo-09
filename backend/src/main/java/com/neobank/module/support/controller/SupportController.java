@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.neobank.module.integrations.orchestrator.Application;
 import com.neobank.module.support.api.OpenCaseAcknowledgement;
 import com.neobank.module.support.api.OpenCaseRequest;
+import com.neobank.module.support.api.CaseSupervisorRequest;
 import com.neobank.module.support.api.CaseTransitionRequest;
 import com.neobank.module.support.api.SupportCaseDetailView;
 import com.neobank.module.support.api.SupportCaseQueueResponse;
@@ -68,6 +69,18 @@ public class SupportController {
             @PathVariable String caseId,
             @Valid @RequestBody CaseTransitionRequest request) {
         return supportCases.transition(caseId, request.action(), request.actor(), request.note());
+    }
+
+    @PostMapping("/cases/{caseId}/supervisor")
+    public SupportCaseDetailView supervisorAction(
+            @PathVariable String caseId,
+            @Valid @RequestBody CaseSupervisorRequest request) {
+        return supportCases.supervisorAction(
+                caseId,
+                request.action(),
+                request.reason(),
+                request.supervisor(),
+                request.assignee());
     }
 
     @GetMapping("/cases/{caseId}/applicant")

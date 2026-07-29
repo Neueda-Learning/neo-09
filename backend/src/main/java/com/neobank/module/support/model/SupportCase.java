@@ -225,6 +225,10 @@ public class SupportCase {
         this.pausedSince = null;
     }
 
+    public void reassign(String newAssignee) {
+        this.assignee = newAssignee;
+    }
+
     public void reopen(Instant freshDeadline) {
         this.status = "OPEN";
         this.resolutionNote = null;

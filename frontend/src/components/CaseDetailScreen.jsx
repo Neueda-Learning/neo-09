@@ -20,6 +20,9 @@ export default function CaseDetailScreen({
   transitionError,
   transitionLoading,
   onTransition,
+  supervisorError,
+  supervisorLoading,
+  onSupervisor,
   applicantError,
   applicantLoading,
   loading,
@@ -30,6 +33,10 @@ export default function CaseDetailScreen({
   const [action, setAction] = useState("PICK_UP");
   const [actor, setActor] = useState("a.khan");
   const [note, setNote] = useState("");
+  const [supervisorAction, setSupervisorAction] = useState("FORCE_CLOSE");
+  const [supervisorReason, setSupervisorReason] = useState("");
+  const [supervisor, setSupervisor] = useState("m.reyes");
+  const [supervisorAssignee, setSupervisorAssignee] = useState("");
 
   const timeline = useMemo(
     () =>
@@ -77,6 +84,18 @@ export default function CaseDetailScreen({
     if (action === "RESOLVE") {
       setNote("");
     }
+  };
+
+  const submitSupervisor = async (event) => {
+    event.preventDefault();
+    if (!onSupervisor || !detail) return;
+    await onSupervisor({
+      action: supervisorAction,
+      reason: supervisorReason.trim(),
+      supervisor: supervisor.trim(),
+      assignee:
+        supervisorAction === "REASSIGN" ? supervisorAssignee.trim() : null,
+    });
   };
 
   return (
@@ -245,6 +264,67 @@ export default function CaseDetailScreen({
                 disabled={transitionLoading || actions.length === 0}
               >
                 {transitionLoading ? "Applying..." : "Apply transition"}
+              </Button>
+            </form>
+
+            <form className="case-supervisor-form" onSubmit={submitSupervisor}>
+              <div className="case-transition-grid">
+                <label>
+                  Supervisor action
+                  <select
+                    value={supervisorAction}
+                    onChange={(event) => setSupervisorAction(event.target.value)}
+                    disabled={supervisorLoading || detail.status === "CLOSED"}
+                  >
+                    <option value="FORCE_CLOSE">FORCE_CLOSE</option>
+                    <option value="REASSIGN">REASSIGN</option>
+                  </select>
+                </label>
+
+                <label>
+                  Supervisor
+                  <input
+                    value={supervisor}
+                    onChange={(event) => setSupervisor(event.target.value)}
+                    placeholder="supervisor id"
+                    disabled={supervisorLoading || detail.status === "CLOSED"}
+                    required
+                  />
+                </label>
+
+                {supervisorAction === "REASSIGN" && (
+                  <label>
+                    Assignee
+                    <input
+                      value={supervisorAssignee}
+                      onChange={(event) => setSupervisorAssignee(event.target.value)}
+                      placeholder="new assignee"
+                      disabled={supervisorLoading || detail.status === "CLOSED"}
+                      required
+                    />
+                  </label>
+                )}
+
+                <label className="case-transition-note">
+                  Reason (required)
+                  <textarea
+                    value={supervisorReason}
+                    onChange={(event) => setSupervisorReason(event.target.value)}
+                    disabled={supervisorLoading || detail.status === "CLOSED"}
+                    required
+                    rows={3}
+                  />
+                </label>
+              </div>
+
+              {supervisorError && (
+                <Alert tone="negative" title="Supervisor action failed">
+                  {supervisorError}
+                </Alert>
+              )}
+
+              <Button type="submit" disabled={supervisorLoading || detail.status === "CLOSED"}>
+                {supervisorLoading ? "Applying..." : "Apply supervisor action"}
               </Button>
             </form>
           </Card>

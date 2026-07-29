@@ -49,6 +49,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  superviseCase: (caseId, payload) =>
+    request(`/api/v1/support/cases/${caseId}/supervisor`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   getApplicant: (caseId) =>
     request(`/api/v1/support/cases/${caseId}/applicant`),
   createConfig: (payload) =>

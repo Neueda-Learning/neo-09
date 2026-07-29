@@ -43,6 +43,8 @@ export default function App() {
   const [detailError, setDetailError] = useState(null);
   const [transitionError, setTransitionError] = useState(null);
   const [transitionLoading, setTransitionLoading] = useState(false);
+  const [supervisorError, setSupervisorError] = useState(null);
+  const [supervisorLoading, setSupervisorLoading] = useState(false);
   const [applicantError, setApplicantError] = useState(null);
   const [health, setHealth] = useState(null);
   const [info, setInfo] = useState(null);
@@ -77,6 +79,7 @@ export default function App() {
     setDetailLoading(true);
     setDetailError(null);
     setTransitionError(null);
+    setSupervisorError(null);
     setApplicant(null);
     loadApplicant(caseId);
     try {
@@ -211,6 +214,29 @@ export default function App() {
     [reload, selectedCaseId],
   );
 
+  const superviseCase = useCallback(
+    async ({ action, reason, supervisor, assignee }) => {
+      if (!selectedCaseId) return;
+      setSupervisorLoading(true);
+      setSupervisorError(null);
+      try {
+        const updated = await api.superviseCase(selectedCaseId, {
+          action,
+          reason,
+          supervisor,
+          assignee,
+        });
+        setDetail(updated);
+        await reload();
+      } catch (failure) {
+        setSupervisorError(failure.message);
+      } finally {
+        setSupervisorLoading(false);
+      }
+    },
+    [reload, selectedCaseId],
+  );
+
   return (
     <AppShell
       side={
@@ -273,6 +299,9 @@ export default function App() {
           transitionError={transitionError}
           transitionLoading={transitionLoading}
           onTransition={transitionCase}
+          supervisorError={supervisorError}
+          supervisorLoading={supervisorLoading}
+          onSupervisor={superviseCase}
           applicantError={applicantError}
           applicantLoading={applicantLoading}
           loading={detailLoading}
