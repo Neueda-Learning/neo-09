@@ -31,7 +31,7 @@ export default function CaseDetailScreen({
   onViewConfig,
 }) {
   const [action, setAction] = useState("PICK_UP");
-  const [actor, setActor] = useState("a.khan");
+  const [actor, setActor] = useState("");
   const [note, setNote] = useState("");
   const [supervisorAction, setSupervisorAction] = useState("FORCE_CLOSE");
   const [supervisorReason, setSupervisorReason] = useState("");
@@ -73,6 +73,13 @@ export default function CaseDetailScreen({
       setAction(actions[0]);
     }
   }, [action, actions]);
+
+  useEffect(() => {
+    const nextActor = detail?.assignee?.trim();
+    if (nextActor) {
+      setActor(nextActor);
+    }
+  }, [detail?.assignee]);
 
   const submitTransition = async (event) => {
     event.preventDefault();
