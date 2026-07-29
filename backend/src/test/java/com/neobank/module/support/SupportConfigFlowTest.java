@@ -69,7 +69,9 @@ class SupportConfigFlowTest {
                 .andExpect(jsonPath("$[0].current").value(true))
                 .andExpect(jsonPath("$[0].categories[0]").value("APPLICATION_STATUS"))
                 .andExpect(jsonPath("$[0].priorityMap.COMPLAINT").value("P1"))
-                .andExpect(jsonPath("$[0].slaHours.P1").value(4));
+                .andExpect(jsonPath("$[0].slaHours.P1").value(4))
+                .andExpect(jsonPath("$[0].keywordMap.CARD_NOT_ARRIVED[0]").value("card"))
+                .andExpect(jsonPath("$[0].keywordMap.CARD_NOT_ARRIVED[2]").value("post"));
     }
 
     @Test

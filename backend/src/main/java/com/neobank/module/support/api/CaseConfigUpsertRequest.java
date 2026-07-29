@@ -8,5 +8,6 @@ import java.util.Map;
 public record CaseConfigUpsertRequest(
         @NotNull @NotEmpty List<String> categories,
         @NotNull @NotEmpty Map<String, String> priorityMap,
-        @NotNull @NotEmpty Map<String, Integer> slaHours) {
+        @NotNull @NotEmpty Map<String, Integer> slaHours,
+        Map<String, List<String>> keywordMap) {
 }

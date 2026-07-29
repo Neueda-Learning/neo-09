@@ -55,6 +55,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  suggestCategory: (caseId) =>
+    request(`/api/v1/support/cases/${caseId}/suggest-category`, {
+      method: "POST",
+    }),
   getApplicant: (caseId) =>
     request(`/api/v1/support/cases/${caseId}/applicant`),
   createConfig: (payload) =>
