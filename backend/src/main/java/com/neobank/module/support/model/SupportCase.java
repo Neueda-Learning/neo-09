@@ -112,6 +112,15 @@ public class SupportCase {
         this.configVersion = configVersion;
     }
 
+    /**
+     * Age escalation (UC 04, rule 1+2): raises the priority one level and recomputes the
+     * deadline as openedAt + the new level's SLA hours + the total paused time so far.
+     */
+    public void escalate(String newPriority, Instant newDeadline) {
+        this.priority = newPriority;
+        this.slaDeadline = newDeadline;
+    }
+
     public String getCaseId() {
         return caseId;
     }

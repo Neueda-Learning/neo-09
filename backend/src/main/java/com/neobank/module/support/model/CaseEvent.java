@@ -79,6 +79,18 @@ public class CaseEvent {
         return transition(caseId, "CALLBACK_SENT", null, null, "SYSTEM", note, at);
     }
 
+    public static CaseEvent priorityEscalated(
+            String caseId, String fromPriority, String toPriority, Instant at) {
+        return transition(
+                caseId,
+                "PRIORITY_ESCALATED",
+                null,
+                null,
+                "SYSTEM",
+                fromPriority + " -> " + toPriority,
+                at);
+    }
+
     public String getCaseId() {
         return caseId;
     }
