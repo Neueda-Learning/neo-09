@@ -126,6 +126,26 @@ class SupportSlaFlowTest {
     }
 
     @Test
+    void caseNotYetPastItsDeadlineDoesNotEscalate() throws Exception {
+        deliver(valid("corr-not-due", "CARD_NOT_ARRIVED", "Still on the clock")); // priced P2, 24h SLA
+        String caseId = supportCases.findByCorrelationId("corr-not-due").orElseThrow().getCaseId();
+
+        // A hair before the deadline — must not be treated as breached or escalated.
+        Instant now = Instant.now();
+        jdbc.update("update support_case set sla_deadline = ? where correlation_id = ?",
+                now.plusSeconds(2), "corr-not-due");
+
+        mvc.perform(get("/api/v1/support/sla"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.breachedCases").isEmpty());
+
+        SupportCase untouched = supportCases.findByCaseId(caseId).orElseThrow();
+        assertThat(untouched.isBreached()).isFalse();
+        assertThat(untouched.getPriority()).isEqualTo("P2");
+        assertThat(caseEvents.countByCaseIdAndEventType(caseId, "PRIORITY_ESCALATED")).isZero();
+    }
+
+    @Test
     void pendingCustomerCaseNeverBreachesOrEscalates() throws Exception {
         deliver(valid("corr-paused", "COMPLAINT", "Waiting on the customer")); // P1, 4h SLA
         String caseId = supportCases.findByCorrelationId("corr-paused").orElseThrow().getCaseId();

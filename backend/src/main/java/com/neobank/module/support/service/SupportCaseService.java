@@ -491,6 +491,9 @@ public class SupportCaseService {
             if (slaHours == null) {
                 CaseConfig config = configs.findById(configVersion).orElse(null);
                 if (config == null) {
+                    log.warn(
+                            "case {} pinned to missing config version {} — skipping age escalation",
+                            supportCase.getCaseId(), configVersion);
                     return;
                 }
                 try {
@@ -503,6 +506,9 @@ public class SupportCaseService {
             String toPriority = PRIORITY_LEVELS_LOW_FIRST.get(level + 1);
             Integer hours = slaHours.get(toPriority);
             if (hours == null) {
+                log.warn(
+                        "case {} config version {} has no sla_hours entry for {} — skipping age escalation",
+                        supportCase.getCaseId(), configVersion, toPriority);
                 return;
             }
             Instant newDeadline = supportCase.getOpenedAt()
