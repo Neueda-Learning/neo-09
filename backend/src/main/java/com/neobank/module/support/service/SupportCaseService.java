@@ -189,8 +189,7 @@ public class SupportCaseService {
     @Transactional
     public SupportCaseQueueResponse queue() {
         Instant now = clock.instant();
-        List<SupportCaseQueueRow> allOpenCases = supportCases.findAll().stream()
-                .filter(supportCase -> isOpen(supportCase.getStatus()))
+        List<SupportCaseQueueRow> allOpenCases = supportCases.findAllOpenForUpdate().stream()
                 .map(supportCase -> {
                     escalateIfNeeded(supportCase, now);
                     refreshBreached(supportCase, now);
@@ -223,8 +222,7 @@ public class SupportCaseService {
         }
 
         List<SlaBreachedCaseView> breachedCases = new ArrayList<>();
-        supportCases.findAll().stream()
-                .filter(supportCase -> isOpen(supportCase.getStatus()))
+        supportCases.findAllOpenForUpdate().stream()
                 .forEach(supportCase -> {
                     escalateIfNeeded(supportCase, now);
                     boolean breached = refreshBreached(supportCase, now);
@@ -256,7 +254,7 @@ public class SupportCaseService {
 
     @Transactional
     public SupportCaseDetailView getCase(String caseId) {
-        SupportCase supportCase = supportCases.findByCaseId(caseId)
+        SupportCase supportCase = supportCases.findByCaseIdForUpdate(caseId)
                 .orElseThrow(() -> new NoSuchElementException("case not found: " + caseId));
         List<SupportCaseEventView> events = caseEvents.findAllByCaseIdOrderByCreatedAtAscIdAsc(caseId)
                 .stream()
@@ -312,7 +310,7 @@ public class SupportCaseService {
             throw new IllegalArgumentException("actor is required");
         }
 
-        SupportCase supportCase = supportCases.findByCaseId(caseId)
+        SupportCase supportCase = supportCases.findByCaseIdForUpdate(caseId)
                 .orElseThrow(() -> new NoSuchElementException("case not found: " + caseId));
         Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         String fromStatus = supportCase.getStatus();
@@ -385,7 +383,7 @@ public class SupportCaseService {
             throw new IllegalArgumentException("supervisor is required");
         }
 
-        SupportCase supportCase = supportCases.findByCaseId(caseId)
+        SupportCase supportCase = supportCases.findByCaseIdForUpdate(caseId)
                 .orElseThrow(() -> new NoSuchElementException("case not found: " + caseId));
         String fromStatus = supportCase.getStatus();
         Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
