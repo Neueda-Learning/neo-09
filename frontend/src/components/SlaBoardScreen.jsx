@@ -92,7 +92,7 @@ export default function SlaBoardScreen({ sla, loading, error, info, onOpenCase }
                   value={
                     tile.averageScore == null
                       ? "—"
-                      : `${Number(tile.averageScore).toFixed(1)} / 5`
+                      : `${Number(tile.averageScore).toFixed(1)} / 5.0`
                   }
                   tone={
                     tile.averageScore == null
