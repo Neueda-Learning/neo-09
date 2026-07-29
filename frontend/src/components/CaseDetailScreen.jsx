@@ -228,12 +228,14 @@ export default function CaseDetailScreen({
                 <Alert
                   tone="warning"
                   title={
-                    applicantError?.includes("not found")
-                      ? "application not found — link may be stale"
-                      : "Applicant details are temporarily unavailable"
+                    applicantError?.status === 404
+                      ? "No application behind this case"
+                      : "Applicant lookup failed"
                   }
                 >
-                  <p>{applicantError ?? "Retry to refresh the sidebar."}</p>
+                  {/* The backend's own message: it is the only thing that knows whether the id
+                      was never dispatched, or the orchestrator could not be reached. */}
+                  <p>{applicantError?.message ?? "Retry to refresh the sidebar."}</p>
                   <Button variant="secondary" size="sm" onClick={onRetry}>
                     Retry applicant lookup
                   </Button>

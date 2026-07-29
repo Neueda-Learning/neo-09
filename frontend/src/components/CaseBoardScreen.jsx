@@ -68,8 +68,19 @@ export default function CaseBoardScreen({
     {
       key: "applicant",
       header: "Applicant",
-      render: (supportCase) =>
-        applicantNames[supportCase.caseId] ?? "Loading…",
+      render: (supportCase) => {
+        const name = applicantNames[supportCase.caseId];
+        if (!name) return "Loading…";
+        // A failed lookup is stated, not hidden behind an em dash. The tooltip carries the
+        // backend's reason — "not dispatched" means no such application in the orchestrator.
+        return name.failed ? (
+          <span className="case-board-applicant-missing" title={name.detail}>
+            {name.label}
+          </span>
+        ) : (
+          name.label
+        );
+      },
     },
     {
       key: "applicationId",

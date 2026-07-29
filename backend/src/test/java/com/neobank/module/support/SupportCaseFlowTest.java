@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.ResourceAccessException;
 
 import com.neobank.module.integrations.orchestrator.Application;
 import com.neobank.module.integrations.orchestrator.OrchestratorClient;
@@ -321,25 +321,50 @@ class SupportCaseFlowTest {
                 .andExpect(jsonPath("$.message").value("case not found: does-not-exist"));
     }
 
+    /**
+     * The three ways an applicant lookup fails, told apart. This is the whole point of the wording:
+     * a 404 is a <em>data</em> fact about this case, everything else is about the orchestrator, and
+     * an operator who cannot tell them apart goes looking for the bug in the wrong repository.
+     */
     @Test
-    void applicantLookupDegradesToJson404Or503() throws Exception {
+    void applicantLookupSaysWhichKindOfFailureItWas() throws Exception {
         deliver(valid("corr-orphan", "OTHER", "Old application link"));
         String caseId = supportCases.findByCorrelationId("corr-orphan").orElseThrow().getCaseId();
 
+        // 1 — no such application. The common case: a case opened by hand or seeded for a demo.
         when(orchestrator.application("app-1001")).thenThrow(
                 HttpClientErrorException.create(
                         HttpStatus.NOT_FOUND, "not found", null, null, null));
         mvc.perform(get("/api/v1/support/cases/" + caseId + "/applicant"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.message")
-                        .value("application not found — link may be stale"));
+                .andExpect(jsonPath("$.message").value("the orchestrator has no application "
+                        + "app-1001 — this case was not created from a dispatch, so its applicant "
+                        + "cannot be fetched"));
 
-        doThrow(new RestClientException("connection refused"))
+        // 2 — it answered, but not with an application. A 405 is a sidecar built before the
+        // lookup endpoint existed, which is a stale image, not a stale link.
+        doThrow(HttpClientErrorException.create(
+                HttpStatus.METHOD_NOT_ALLOWED, "method not allowed", null, null, null))
                 .when(orchestrator).application("app-1001");
         mvc.perform(get("/api/v1/support/cases/" + caseId + "/applicant"))
                 .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.message").value("application lookup unavailable"));
+                .andExpect(jsonPath("$.message").value("the orchestrator answered "
+                        + "405 METHOD_NOT_ALLOWED when asked for application app-1001"));
+
+        // 3 — never reached it. The cause is named as well as quoted: an UnknownHostException's
+        // message is the bare hostname and explains nothing on its own.
+        doThrow(new ResourceAccessException("I/O error", new java.net.UnknownHostException("sidecar")))
+                .when(orchestrator).application("app-1001");
+        mvc.perform(get("/api/v1/support/cases/" + caseId + "/applicant"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.message").value("could not reach the orchestrator to fetch "
+                        + "application app-1001 (UnknownHostException: sidecar)"));
     }
+
+    // No test for a case with a null application_id: the column is NOT NULL (changelog 002) and
+    // @NotBlank rejects a blank one at the door, so it is unreachable from here. The guard in
+    // SupportCaseService.applicant() stays anyway — two lines to never issue
+    // GET …/applications/null if a future path builds a case some other way.
 
     @Test
     void supportEndpointsArePublishedInOpenApi() throws Exception {
