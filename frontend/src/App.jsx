@@ -411,8 +411,8 @@ export default function App() {
       side={
         <>
           <SideBrand
-            brand="NEO · 09"
-            product="Support Control"
+            brand="Neo Bank"
+            product="Customer Support"
             meta={info ? `${info.team ?? "Operations"} · ${info.domain}` : "Customer case management"}
           />
           <SideNav
@@ -448,7 +448,7 @@ export default function App() {
           </div>
         </>
       }
-      footer="Support Control · application data is fetched live and never copied into this service"
+      footer="Customer Support · application data is fetched live and never copied into this service"
     >
       {screen === "cases" && (
         <CaseBoardScreen
