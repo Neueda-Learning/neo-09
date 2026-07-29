@@ -43,10 +43,19 @@ function draftFrom(version) {
       P2: String(version.slaHours.P2),
       P3: String(version.slaHours.P3),
     },
+    keywordMap:
+      version.keywordMap == null
+        ? null
+        : Object.fromEntries(
+            Object.entries(version.keywordMap).map(([category, keywords]) => [
+              category,
+              [...keywords],
+            ])
+          ),
   };
 }
 
-function configSignature(categories, priorityMap, slaHours) {
+function configSignature(categories, priorityMap, slaHours, keywordMap) {
   return JSON.stringify({
     categories,
     priorityMap: categories.reduce((result, category) => {
@@ -58,10 +67,21 @@ function configSignature(categories, priorityMap, slaHours) {
       P2: Number(slaHours.P2),
       P3: Number(slaHours.P3),
     },
+    keywordMap:
+      keywordMap == null
+        ? null
+        : categories.reduce((result, category) => {
+            if (Object.hasOwn(keywordMap, category)) {
+              result[category] = keywordMap[category]
+                .map((keyword) => keyword.trim().toLowerCase())
+                .filter(Boolean);
+            }
+            return result;
+          }, {}),
   });
 }
 
-function validateDraft(categories, slaHours) {
+function validateDraft(categories, slaHours, keywordMap) {
   const errors = {};
   if (categories.length === 0) {
     errors.categories = 'Add at least one category.';
@@ -80,6 +100,15 @@ function validateDraft(categories, slaHours) {
   } else if (!(hours[0] < hours[1] && hours[1] < hours[2])) {
     errors.slaHours = 'SLA hours must increase from P1 to P3: P1 < P2 < P3.';
   }
+  if (keywordMap != null) {
+    for (const [category, keywords] of Object.entries(keywordMap)) {
+      const normalized = keywords.map((keyword) => keyword.trim().toLowerCase());
+      if (new Set(normalized).size !== normalized.length) {
+        errors.keywordMap = `${category} has duplicate keywords.`;
+        break;
+      }
+    }
+  }
   return errors;
 }
 
@@ -93,6 +122,7 @@ export default function CaseConfigScreen({ info, initialVersion }) {
   const [categoriesText, setCategoriesText] = useState('');
   const [priorityMap, setPriorityMap] = useState({});
   const [slaHours, setSlaHours] = useState(DEFAULT_SLA);
+  const [keywordMap, setKeywordMap] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [requestError, setRequestError] = useState(null);
@@ -104,6 +134,7 @@ export default function CaseConfigScreen({ info, initialVersion }) {
     setCategoriesText(draft.categoriesText);
     setPriorityMap(draft.priorityMap);
     setSlaHours(draft.slaHours);
+    setKeywordMap(draft.keywordMap);
     setServerFieldErrors({});
   }, []);
 
@@ -139,17 +170,23 @@ export default function CaseConfigScreen({ info, initialVersion }) {
     [history, selectedVersion]
   );
   const clientErrors = useMemo(
-    () => validateDraft(categories, slaHours),
-    [categories, slaHours]
+    () => validateDraft(categories, slaHours, keywordMap),
+    [categories, keywordMap, slaHours]
   );
   const fieldErrors = {
     categories: serverFieldErrors.categories?.join(' ') ?? clientErrors.categories,
     priorityMap: serverFieldErrors.priorityMap?.join(' '),
     slaHours: serverFieldErrors.slaHours?.join(' ') ?? clientErrors.slaHours,
+    keywordMap: serverFieldErrors.keywordMap?.join(' ') ?? clientErrors.keywordMap,
   };
   const dirty = current
-    ? configSignature(categories, priorityMap, slaHours)
-      !== configSignature(current.categories, current.priorityMap, current.slaHours)
+    ? configSignature(categories, priorityMap, slaHours, keywordMap)
+      !== configSignature(
+        current.categories,
+        current.priorityMap,
+        current.slaHours,
+        current.keywordMap
+      )
     : false;
   const canSubmit = dirty && Object.keys(clientErrors).length === 0 && !submitting;
 
@@ -181,6 +218,10 @@ export default function CaseConfigScreen({ info, initialVersion }) {
       render: (row) => <Badge tone="neutral">{row.priority}</Badge>,
     },
   ];
+  const snapshotKeywordColumns = [
+    { key: 'category', header: 'Category' },
+    { key: 'keywords', header: 'Keywords' },
+  ];
 
   const onCategoriesChange = (value) => {
     setCategoriesText(value);
@@ -191,6 +232,16 @@ export default function CaseConfigScreen({ info, initialVersion }) {
       const next = {};
       for (const category of nextCategories) {
         next[category] = previous[category] ?? 'P3';
+      }
+      return next;
+    });
+    setKeywordMap((previous) => {
+      if (previous == null) return null;
+      const next = {};
+      for (const category of nextCategories) {
+        if (Object.hasOwn(previous, category)) {
+          next[category] = previous[category];
+        }
       }
       return next;
     });
@@ -216,6 +267,17 @@ export default function CaseConfigScreen({ info, initialVersion }) {
           P2: Number(slaHours.P2),
           P3: Number(slaHours.P3),
         },
+        keywordMap:
+          keywordMap == null
+            ? null
+            : categories.reduce((result, category) => {
+                if (Object.hasOwn(keywordMap, category)) {
+                  result[category] = keywordMap[category]
+                    .map((keyword) => keyword.trim().toLowerCase())
+                    .filter(Boolean);
+                }
+                return result;
+              }, {}),
       };
       const created = await api.createConfig(payload);
       setSuccess(`Version v${created.version} is now current. Existing cases keep their pinned version.`);
@@ -308,6 +370,29 @@ export default function CaseConfigScreen({ info, initialVersion }) {
                       value: `${selected.slaHours[priority]} hours`,
                     }))}
                   />
+                  {selected.keywordMap == null ? (
+                    <Alert tone="neutral" title="Category suggestions off">
+                      This version has no keyword map.
+                    </Alert>
+                  ) : (
+                    <DataTable
+                      columns={snapshotKeywordColumns}
+                      rows={selected.categories
+                        .filter((category) => Object.hasOwn(selected.keywordMap, category))
+                        .map((category) => ({
+                          category,
+                          keywords: selected.keywordMap[category].join(', ') || '—',
+                        }))}
+                      rowKey={(row) => row.category}
+                      maxRows={null}
+                      footnote="Distinct matches are scored; ties sort by category."
+                      empty={
+                        <EmptyState title="No keyword rules">
+                          Suggestions are enabled, but this version has no category rules.
+                        </EmptyState>
+                      }
+                    />
+                  )}
                   <Caption>
                     This snapshot is immutable. To reuse an older policy, create a new version from it.
                   </Caption>
@@ -434,6 +519,71 @@ export default function CaseConfigScreen({ info, initialVersion }) {
                   )}
                 </Field>
               ))}
+
+              <FormGrid.Full>
+                <div className="config-subsection-heading">
+                  <div>
+                    <h3>Category suggestion keywords</h3>
+                    <span>
+                      Optional. Suggestions guide agents and never change the stored category.
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setSuccess(null);
+                      setServerFieldErrors({});
+                      setKeywordMap((previous) => previous == null ? {} : null);
+                    }}
+                  >
+                    {keywordMap == null ? 'Enable suggestions' : 'Disable suggestions'}
+                  </Button>
+                </div>
+                {fieldErrors.keywordMap && (
+                  <Alert tone="negative" title="Keyword mapping is invalid">
+                    {fieldErrors.keywordMap}
+                  </Alert>
+                )}
+              </FormGrid.Full>
+
+              {keywordMap == null ? (
+                <FormGrid.Full>
+                  <EmptyState title="Suggestions are off">
+                    Enable them to add comma-separated keywords for any category.
+                  </EmptyState>
+                </FormGrid.Full>
+              ) : (
+                categories.map((category, index) => (
+                  <Field
+                    key={`keyword-${category}-${index}`}
+                    label={`Keywords for ${category}`}
+                    hint="Comma-separated; each distinct match scores once."
+                    htmlFor={`keywords-${index}`}
+                  >
+                    {({ id }) => (
+                      <TextInput
+                        id={id}
+                        value={(keywordMap[category] ?? []).join(', ')}
+                        placeholder="word, phrase, delivery"
+                        onChange={(event) => {
+                          setSuccess(null);
+                          setServerFieldErrors({});
+                          const keywords = event.target.value
+                            .split(',')
+                            .map((keyword) => keyword.trim())
+                            .filter(Boolean);
+                          setKeywordMap((previous) => ({
+                            ...(previous ?? {}),
+                            [category]: keywords,
+                          }));
+                        }}
+                      />
+                    )}
+                  </Field>
+                ))
+              )}
             </FormGrid>
 
             <FormActions>

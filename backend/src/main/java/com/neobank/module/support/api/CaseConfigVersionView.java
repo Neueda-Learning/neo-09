@@ -9,6 +9,7 @@ public record CaseConfigVersionView(
         List<String> categories,
         Map<String, String> priorityMap,
         Map<String, Integer> slaHours,
+        Map<String, List<String>> keywordMap,
         Instant effectiveFrom,
         boolean current) {
 }

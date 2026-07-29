@@ -27,6 +27,10 @@ public class CaseConfig {
     @Column(name = "sla_hours_json", nullable = false, columnDefinition = "json")
     private String slaHoursJson;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "keyword_map_json", columnDefinition = "json")
+    private String keywordMapJson;
+
     @Column(name = "effective_from", nullable = false, insertable = false, updatable = false)
     private Instant effectiveFrom;
 
@@ -38,12 +42,14 @@ public class CaseConfig {
             int version,
             String categoriesJson,
             String priorityMapJson,
-            String slaHoursJson) {
+            String slaHoursJson,
+            String keywordMapJson) {
         CaseConfig config = new CaseConfig();
         config.version = version;
         config.categoriesJson = categoriesJson;
         config.priorityMapJson = priorityMapJson;
         config.slaHoursJson = slaHoursJson;
+        config.keywordMapJson = keywordMapJson;
         return config;
     }
 
@@ -61,6 +67,10 @@ public class CaseConfig {
 
     public String getSlaHoursJson() {
         return slaHoursJson;
+    }
+
+    public String getKeywordMapJson() {
+        return keywordMapJson;
     }
 
     public Instant getEffectiveFrom() {

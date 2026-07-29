@@ -225,6 +225,13 @@
   gap: var(--ds-space-4);
 }
 
+.category-suggestion {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3) 0;
+}
+
 @media (max-width: 860px) {
   .app-side-status {
     margin-top: 0;

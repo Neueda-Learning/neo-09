@@ -30,6 +30,9 @@ export default function CaseDetailScreen({
   loading,
   detail,
   applicant,
+  suggestions,
+  suggestionLoading,
+  suggestionError,
   onViewConfig,
 }) {
   const [action, setAction] = useState("PICK_UP");
@@ -230,6 +233,13 @@ export default function CaseDetailScreen({
                 This active case is past its current deadline and requires
                 immediate attention.
               </Alert>
+            )}
+            {detail.category === "OTHER" && (
+              <CategorySuggestion
+                suggestions={suggestions}
+                loading={suggestionLoading}
+                error={suggestionError}
+              />
             )}
             <KeyValue
               items={[
@@ -465,6 +475,36 @@ export default function CaseDetailScreen({
         </Split>
       ) : null}
     </>
+  );
+}
+
+function CategorySuggestion({ suggestions = [], loading, error }) {
+  if (loading) {
+    return (
+      <div className="category-suggestion" aria-live="polite">
+        <Spinner label="Checking category suggestions" />
+        <span>Checking the current keyword policy…</span>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <Alert tone="warning" title="Category suggestion unavailable">
+        The case is unchanged. {error}
+      </Alert>
+    );
+  }
+  if (suggestions.length === 0) return null;
+
+  const top = suggestions[0];
+  return (
+    <Alert tone="info" title={`Suggested category: ${top.category}`}>
+      <p>
+        Matched {top.score} distinct {top.score === 1 ? "keyword" : "keywords"}:{" "}
+        {top.matchedKeywords.join(", ")}.
+      </p>
+      <p>This is guidance only; the customer&apos;s stored category remains OTHER.</p>
+    </Alert>
   );
 }
 

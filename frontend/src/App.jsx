@@ -58,6 +58,9 @@ export default function App() {
   const [supervisorError, setSupervisorError] = useState(null);
   const [supervisorLoading, setSupervisorLoading] = useState(false);
   const [applicantError, setApplicantError] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [suggestionError, setSuggestionError] = useState(null);
   const [health, setHealth] = useState(null);
   const [info, setInfo] = useState(null);
   const boardUrlRef = useRef(boardUrl(initialFilters, BASE_PATH));
@@ -153,10 +156,27 @@ export default function App() {
     setApplicantError(null);
     setTransitionError(null);
     setSupervisorError(null);
+    setSuggestions([]);
+    setSuggestionLoading(false);
+    setSuggestionError(null);
 
     api.getCase(selectedCaseId)
       .then((result) => {
-        if (active) setDetail(result);
+        if (!active) return;
+        setDetail(result);
+        if (result.category === "OTHER") {
+          setSuggestionLoading(true);
+          api.suggestCategory(selectedCaseId)
+            .then((matches) => {
+              if (active) setSuggestions(matches);
+            })
+            .catch((failure) => {
+              if (active) setSuggestionError(failure.message);
+            })
+            .finally(() => {
+              if (active) setSuggestionLoading(false);
+            });
+        }
       })
       .catch((failure) => {
         if (active) setDetailError(failure.message);
@@ -447,6 +467,9 @@ export default function App() {
           loading={detailLoading}
           detail={detail}
           applicant={applicant}
+          suggestions={suggestions}
+          suggestionLoading={suggestionLoading}
+          suggestionError={suggestionError}
           onViewConfig={openConfig}
         />
       )}

@@ -12,7 +12,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,8 @@ public class SupportConfigService {
     private static final TypeReference<List<String>> CATEGORIES = new TypeReference<>() { };
     private static final TypeReference<Map<String, String>> PRIORITY_MAP = new TypeReference<>() { };
     private static final TypeReference<Map<String, Integer>> SLA_MAP = new TypeReference<>() { };
+    private static final TypeReference<Map<String, List<String>>> KEYWORD_MAP =
+            new TypeReference<>() { };
 
     private final CaseConfigRepository configs;
     private final ObjectMapper objectMapper;
@@ -42,22 +46,26 @@ public class SupportConfigService {
         List<String> categories = normalizeCategories(request.categories());
         Map<String, String> priorityMap = normalizePriorityMap(categories, request.priorityMap());
         Map<String, Integer> slaHours = normalizeSlaHours(request.slaHours());
+        Map<String, List<String>> keywordMap =
+                normalizeKeywordMap(categories, request.keywordMap());
 
         String categoriesJson = writeJson(categories);
         String priorityMapJson = writeJson(priorityMap);
         String slaHoursJson = writeJson(slaHours);
+        String keywordMapJson = keywordMap == null ? null : writeJson(keywordMap);
 
         CaseConfig current = configs.lockCurrent().orElse(null);
         if (current != null
                 && readCategories(current.getCategoriesJson()).equals(categories)
                 && readPriorityMap(current.getPriorityMapJson()).equals(priorityMap)
-                && readSlaHours(current.getSlaHoursJson()).equals(slaHours)) {
+                && readSlaHours(current.getSlaHoursJson()).equals(slaHours)
+                && Objects.equals(readKeywordMap(current.getKeywordMapJson()), keywordMap)) {
             return new CaseConfigVersionCreated(current.getVersion());
         }
 
         int nextVersion = current == null ? 1 : current.getVersion() + 1;
         CaseConfig config = CaseConfig.create(
-                nextVersion, categoriesJson, priorityMapJson, slaHoursJson);
+                nextVersion, categoriesJson, priorityMapJson, slaHoursJson, keywordMapJson);
         configs.saveAndFlush(config);
         return new CaseConfigVersionCreated(nextVersion);
     }
@@ -77,6 +85,7 @@ public class SupportConfigService {
                     readCategories(row.getCategoriesJson()),
                     readPriorityMap(row.getPriorityMapJson()),
                     readSlaHours(row.getSlaHoursJson()),
+                    readKeywordMap(row.getKeywordMapJson()),
                     row.getEffectiveFrom(),
                     row.getVersion() == currentVersion));
         }
@@ -137,6 +146,36 @@ public class SupportConfigService {
             }
         }
 
+        Map<String, List<String>> keywordMap = request.keywordMap();
+        if (keywordMap != null) {
+            for (String mapped : keywordMap.keySet()) {
+                if (!categorySet.contains(mapped)) {
+                    addError(errors, "keywordMap", "has unknown category " + mapped);
+                }
+            }
+            for (Map.Entry<String, List<String>> entry : keywordMap.entrySet()) {
+                List<String> keywords = entry.getValue();
+                if (keywords == null) {
+                    addError(errors, "keywordMap", "keyword lists must not be null");
+                    continue;
+                }
+                Set<String> normalized = new LinkedHashSet<>();
+                for (String keyword : keywords) {
+                    String value = keyword == null
+                            ? ""
+                            : keyword.trim().toLowerCase(Locale.ROOT);
+                    if (value.isBlank()) {
+                        addError(errors, "keywordMap", "keywords must not be blank");
+                        break;
+                    }
+                    if (!normalized.add(value)) {
+                        addError(errors, "keywordMap", "keywords must be unique per category");
+                        break;
+                    }
+                }
+            }
+        }
+
         if (!errors.isEmpty()) {
             throw new InvalidCaseConfigException(errors);
         }
@@ -175,6 +214,26 @@ public class SupportConfigService {
         return normalized;
     }
 
+    private Map<String, List<String>> normalizeKeywordMap(
+            List<String> categories,
+            Map<String, List<String>> raw) {
+        if (raw == null) {
+            return null;
+        }
+        Map<String, List<String>> normalized = new LinkedHashMap<>();
+        for (String category : categories) {
+            if (!raw.containsKey(category)) {
+                continue;
+            }
+            List<String> keywords = new ArrayList<>();
+            for (String keyword : raw.get(category)) {
+                keywords.add(keyword.trim().toLowerCase(Locale.ROOT));
+            }
+            normalized.put(category, keywords);
+        }
+        return normalized;
+    }
+
     private String writeJson(Object value) {
         try {
             return objectMapper.writeValueAsString(value);
@@ -204,6 +263,17 @@ public class SupportConfigService {
             return objectMapper.readValue(value, SLA_MAP);
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("stored sla_hours_json is invalid", ex);
+        }
+    }
+
+    private Map<String, List<String>> readKeywordMap(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(value, KEYWORD_MAP);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("stored keyword_map_json is invalid", ex);
         }
     }
 }
