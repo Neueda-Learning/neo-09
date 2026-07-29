@@ -1,23 +1,35 @@
-/* App-specific rules only. Everything visual — colour, type, spacing, radii — comes
- * from the design system's custom properties; this file adds no new values, only
- * the layouts the system has no component for.
- *
- * If something here grows into a pattern three screens need, it belongs in the
- * design system (DESIGN.md § "When the system does not have what you need") — which
- * is exactly how SideNav and SideBrand got there.
- *
- * It used to hold rules for a scenario picker and an expandable row detail. Both
- * components are gone (the picker moved to the sidecar, the detail went with the
- * placeholder table's three columns), so their rules went with them: CSS for a
- * component that no longer exists is the hardest kind of dead code to notice. */
+/* Product-specific composition. Shared visual values remain design-system tokens. */
 
-/* Health and refresh, under the side menu. Not menu items — a row in a menu that is
- * not a screen is a trap — and not a top bar either, because there is no longer one. */
 .app-side-status {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
+  justify-content: space-between;
   gap: var(--ds-space-3);
-  padding: 0 var(--ds-space-2);
+  margin-top: auto;
+  padding: var(--ds-space-4) var(--ds-space-3) 0;
+  border-top: var(--ds-border-width) solid var(--ds-color-nav-divider);
+}
+
+.app-side-status > div {
+  display: grid;
+  gap: var(--ds-space-2);
+}
+
+.app-side-status__label {
+  color: var(--ds-color-nav-ink-muted);
+  font-size: var(--ds-text-2xs);
+  font-weight: var(--ds-weight-semibold);
+  letter-spacing: var(--ds-tracking-label);
+  text-transform: uppercase;
+}
+
+.app-side-status .ds-btn {
+  color: var(--ds-color-nav-ink-muted);
+}
+
+.app-side-status .ds-btn:hover {
+  color: var(--ds-color-nav-ink);
+  background: var(--ds-color-nav-hover);
 }
 
 .case-board-loading {
@@ -25,35 +37,48 @@
   align-items: center;
   justify-content: center;
   gap: var(--ds-space-3);
-  min-height: var(--ds-space-10);
+  min-height: 180px;
+  border: var(--ds-border-width) solid var(--ds-color-border-subtle);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-color-surface);
   color: var(--ds-color-text-muted);
 }
 
-.case-detail-card {
-  margin-top: var(--ds-space-5);
+.case-search-guidance {
+  min-height: 20px;
+  margin: calc(-1 * var(--ds-space-3)) 0 var(--ds-space-4);
+  color: var(--ds-color-text-muted);
+  font-size: var(--ds-text-sm);
 }
 
-.case-detail-card .ds-card__body {
+.case-board-status-filter {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+}
+
+.case-board-status-filter > span {
+  color: var(--ds-color-text-muted);
+  font-size: var(--ds-text-xs);
+  font-weight: var(--ds-weight-semibold);
+  letter-spacing: var(--ds-tracking-label);
+  text-transform: uppercase;
+}
+
+.case-transition-form,
+.case-supervisor-form {
   display: grid;
   gap: var(--ds-space-4);
-}
-
-.case-transition-form {
-  display: grid;
-  gap: var(--ds-space-3);
-  margin-top: var(--ds-space-4);
-  padding-top: var(--ds-space-3);
+  margin-top: var(--ds-space-5);
+  padding-top: var(--ds-space-5);
   border-top: var(--ds-border-width) solid var(--ds-color-border-subtle);
 }
 
 .case-supervisor-form {
-  display: grid;
-  gap: var(--ds-space-3);
-  margin-top: var(--ds-space-4);
-  padding-top: var(--ds-space-3);
-  border-top: var(--ds-border-width) solid var(--ds-color-border-subtle);
+  margin-top: var(--ds-space-6);
 }
 
+.case-work-heading,
 .case-supervisor-header {
   display: flex;
   align-items: flex-start;
@@ -61,10 +86,14 @@
   gap: var(--ds-space-3);
 }
 
+.case-work-heading h3,
 .case-supervisor-header h3 {
   margin: 0;
+  color: var(--ds-color-text);
+  font-size: var(--ds-text-lg);
 }
 
+.case-work-heading p,
 .case-supervisor-meta {
   margin: var(--ds-space-1) 0 0;
   color: var(--ds-color-text-muted);
@@ -73,36 +102,90 @@
 
 .case-transition-grid {
   display: grid;
-  gap: var(--ds-space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ds-space-4);
 }
 
 .case-transition-grid label {
   display: grid;
-  gap: var(--ds-space-1);
-  font-size: var(--ds-text-sm);
+  align-content: start;
+  gap: var(--ds-space-2);
   color: var(--ds-color-text-muted);
+  font-size: var(--ds-text-xs);
+  font-weight: var(--ds-weight-semibold);
+  letter-spacing: var(--ds-tracking-label);
+  text-transform: uppercase;
+}
+
+.case-transition-note {
+  grid-column: 1 / -1;
 }
 
 .case-transition-grid input,
 .case-transition-grid select,
 .case-transition-grid textarea {
   width: 100%;
-  font: inherit;
-  color: var(--ds-color-text);
-  background: var(--ds-color-surface);
+  min-width: 0;
+  min-height: var(--ds-control-height);
+  padding: var(--ds-space-2) var(--ds-space-3);
   border: var(--ds-border-width) solid var(--ds-color-border);
-  border-radius: var(--ds-radius-sm);
-  padding: var(--ds-space-2);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-control-fill);
+  color: var(--ds-color-text);
+  font: inherit;
+  font-size: var(--ds-text-md);
+  font-weight: var(--ds-weight-regular);
+  letter-spacing: normal;
+  text-transform: none;
+  transition: border-color var(--ds-transition), box-shadow var(--ds-transition);
+}
+
+.case-transition-grid input:hover:not(:disabled),
+.case-transition-grid select:hover:not(:disabled),
+.case-transition-grid textarea:hover:not(:disabled) {
+  border-color: var(--ds-color-border-strong);
 }
 
 .case-transition-grid textarea {
+  min-height: 92px;
   resize: vertical;
+}
+
+.case-transition-grid :disabled {
+  background: var(--ds-color-surface-sunken);
+  color: var(--ds-color-text-muted);
+  cursor: not-allowed;
+}
+
+.case-locked-state {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ds-space-3);
+  margin-top: var(--ds-space-5);
+  padding: var(--ds-space-4);
+  border: var(--ds-border-width) solid var(--ds-color-border-subtle);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-color-surface-sunken);
+}
+
+.case-locked-state strong {
+  color: var(--ds-color-text);
+}
+
+.case-locked-state p {
+  margin-top: var(--ds-space-1);
+  color: var(--ds-color-text-muted);
+  font-size: var(--ds-text-sm);
+}
+
+.ds-card__body > .ds-alert:first-child {
+  margin-bottom: var(--ds-space-5);
 }
 
 .config-editor-pane,
 .config-history-pane {
   display: grid;
-  gap: var(--ds-space-4);
+  gap: var(--ds-space-5);
 }
 
 .config-editor-pane h2,
@@ -128,7 +211,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: var(--ds-space-3);
-  padding-top: var(--ds-space-2);
+  padding-top: var(--ds-space-3);
   border-top: var(--ds-border-width) solid var(--ds-color-border-subtle);
 }
 
@@ -149,14 +232,33 @@
   padding: var(--ds-space-3) 0;
 }
 
-@media (max-width: 520px) {
-  .config-section-heading,
-  .config-subsection-heading {
-    align-items: flex-start;
-    flex-direction: column;
+@media (max-width: 860px) {
+  .app-side-status {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .case-transition-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .case-supervisor-header {
+  .case-transition-note {
+    grid-column: auto;
+  }
+
+  .case-board-status-filter {
+    width: 100%;
+  }
+
+  .case-board-status-filter .ds-select {
+    flex: 1;
+  }
+
+  .config-section-heading,
+  .config-subsection-heading,
+  .case-supervisor-header,
+  .case-work-heading {
     align-items: stretch;
     flex-direction: column;
   }

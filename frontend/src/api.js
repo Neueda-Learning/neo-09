@@ -31,9 +31,9 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-// This UI only ever READS. Applications arrive from the orchestrator — the real one, or the
-// sidecar playing it at http://localhost:9000 — never from a button in here. That is the
-// contract: your module is called, it does not call itself.
+// Applications arrive from the orchestrator — the real one, or the sidecar playing it at
+// http://localhost:9000 — never from a button in here. The support workspace can mutate cases
+// through its own APIs, but it must not add a back door that submits applications to itself.
 export const api = {
   health: () => request("/health"),
   info: () => request("/info"),

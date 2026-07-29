@@ -207,21 +207,6 @@ export default function CaseConfigScreen({ info, initialVersion }) {
         </Badge>
       ),
     },
-    {
-      key: 'select',
-      header: 'Snapshot',
-      tight: true,
-      render: (row) => (
-        <Button
-          size="sm"
-          variant="ghost"
-          aria-pressed={row.version === selectedVersion}
-          onClick={() => setSelectedVersion(row.version)}
-        >
-          {row.version === selectedVersion ? 'Viewing' : 'View'}
-        </Button>
-      ),
-    },
   ];
 
   const snapshotPriorityColumns = [
@@ -343,13 +328,15 @@ export default function CaseConfigScreen({ info, initialVersion }) {
                 </div>
               </div>
               <DataTable
+                aria-label="Configuration version history"
                 columns={historyColumns}
                 rows={history}
                 rowKey={(row) => row.version}
+                onRowClick={(row) => setSelectedVersion(row.version)}
                 maxRows={null}
                 total={history.length}
                 selectedKey={selectedVersion}
-                footnote="insert-only history · current is MAX(version)"
+                footnote="select a row to inspect · insert-only history · current is MAX(version)"
                 empty={
                   <EmptyState title="No configuration versions">
                     The seed should create v1 on first boot.
@@ -367,6 +354,7 @@ export default function CaseConfigScreen({ info, initialVersion }) {
                   }
                 >
                   <DataTable
+                    aria-label={`Priority mapping for configuration version ${selected.version}`}
                     columns={snapshotPriorityColumns}
                     rows={selected.categories.map((category) => ({
                       category,

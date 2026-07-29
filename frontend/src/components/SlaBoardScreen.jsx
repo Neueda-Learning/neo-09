@@ -43,8 +43,8 @@ export default function SlaBoardScreen({ sla, loading, error, info, onOpenCase }
   return (
     <>
       <PageHeader
-        title="SLA & Breach"
-        lede="per-priority load and the worst breaches — where the desk is losing, before the customer says so"
+        title="SLA oversight"
+        lede="Open load by priority and the ten most overdue cases requiring intervention."
         meta={
           sla?.referenceNow
             ? `reference now ${time(sla.referenceNow)}${info ? ` · ${info.serviceId}` : ""}`
@@ -79,11 +79,13 @@ export default function SlaBoardScreen({ sla, loading, error, info, onOpenCase }
           </Grid>
 
           <DataTable
+            aria-label="Worst SLA breaches"
             columns={columns}
             rows={breachedCases}
             total={breachedCases.length}
             rowKey={(row) => row.caseId}
             onRowClick={(row) => onOpenCase?.(row.caseId)}
+            rowTone={() => "negative"}
             footnote="worst breaches · most overdue first · capped at 10"
             empty={
               <EmptyState title="No breaches right now">

@@ -38,5 +38,17 @@ export const priorityTone = toneMapper({
 });
 
 export function time(iso) {
-  return iso ? new Date(iso).toLocaleTimeString() : '—';
+  if (!iso) return '—';
+  const value = new Date(iso);
+  if (Number.isNaN(value.getTime())) return '—';
+  const date = new Intl.DateTimeFormat(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(value);
+  const clock = new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(value);
+  return `${date} · ${clock}`;
 }
