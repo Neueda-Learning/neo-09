@@ -6,6 +6,8 @@ import {
   ChipGroup,
   DataTable,
   EmptyState,
+  Grid,
+  MetricTile,
   PageHeader,
   SearchInput,
   Select,
@@ -15,68 +17,6 @@ import {
 import { caseStatusTone, priorityTone, time } from "../status.js";
 
 const PRIORITIES = ["All", "P1", "P2", "P3"];
-
-const WAVE_PATHS = {
-  green: "M2 31 C20 7 36 42 55 23 S87 9 102 30 S132 39 150 8",
-  gold: "M2 15 C21 37 38 36 55 18 S86 2 103 20 S130 38 150 13",
-  plum: "M2 27 C17 13 36 9 55 24 S87 42 105 19 S135 5 150 25",
-  silver: "M2 23 C25 3 42 42 65 22 S100 10 116 27 S140 38 150 17",
-};
-
-function QueueMetric({ label, value, hint, tone = "green" }) {
-  return (
-    <article className={`queue-metric queue-metric--${tone}`}>
-      <div className="queue-metric__head">
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </div>
-      <p>{hint}</p>
-      <svg viewBox="0 0 152 46" preserveAspectRatio="none" aria-hidden="true">
-        <path d={WAVE_PATHS[tone]} />
-      </svg>
-    </article>
-  );
-}
-
-function PriorityMix({ rows }) {
-  const mix = PRIORITIES.slice(1).map((priority) => ({
-    priority,
-    count: rows.filter((supportCase) => supportCase.priority === priority).length,
-  }));
-  const max = Math.max(1, ...mix.map((item) => item.count));
-
-  return (
-    <section className="queue-mix" aria-labelledby="priority-mix-title">
-      <div className="queue-mix__heading">
-        <div>
-          <h2 id="priority-mix-title">Priority mix</h2>
-          <p>Visible queue distribution</p>
-        </div>
-        <span className="queue-mix__legend">
-          <i aria-hidden="true" /> live cases
-        </span>
-      </div>
-      <div className="queue-mix__chart" role="img" aria-label={mix.map((item) => `${item.priority}: ${item.count}`).join(", ")}>
-        {mix.map((item) => (
-          <div className="queue-mix__group" key={item.priority}>
-            <div className="queue-mix__bars">
-              <span
-                className="queue-mix__bar queue-mix__bar--gold"
-                style={{ height: `${Math.max(10, (item.count / max) * 72)}%` }}
-              />
-              <span
-                className="queue-mix__bar queue-mix__bar--green"
-                style={{ height: `${Math.max(16, (item.count / max) * 100)}%` }}
-              />
-            </div>
-            <strong>{item.priority}</strong>
-            <small>{item.count}</small>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 export default function CaseBoardScreen({
   queue,
@@ -194,34 +134,24 @@ export default function CaseBoardScreen({
           {error} — the board retries every two seconds.
         </Alert>
       )}
-      <div className="queue-overview">
-        <div className="queue-overview__metrics">
-          <QueueMetric
-            label="Open cases"
-            value={queue?.totalOpen ?? 0}
-            hint="All active customer requests"
-          />
-          <QueueMetric
-            label="SLA breached"
-            value={queue?.breached ?? 0}
-            hint="Cases requiring intervention"
-            tone="gold"
-          />
-          <QueueMetric
-            label="Urgent P1"
-            value={counts.P1 ?? 0}
-            hint="Highest-priority visible cases"
-            tone="plum"
-          />
-          <QueueMetric
-            label="Visible queue"
-            value={queue?.cases?.length ?? 0}
-            hint="Maximum 10 · worst first"
-            tone="silver"
-          />
-        </div>
-        <PriorityMix rows={queue?.cases ?? []} />
-      </div>
+      <Grid
+        cols={3}
+        min={180}
+        className="queue-number-board"
+      >
+        <MetricTile label="Open cases" value={queue?.totalOpen ?? 0} />
+        <MetricTile
+          label="Breached"
+          value={queue?.breached ?? 0}
+          tone="warning"
+        />
+        <MetricTile
+          label="Visible queue rows"
+          value={queue?.cases?.length ?? 0}
+          hint="Maximum 10 · worst first"
+          tone="neutral"
+        />
+      </Grid>
 
       <div className="queue-list-heading">
         <div>
