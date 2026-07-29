@@ -34,7 +34,12 @@ export default function App() {
   const initialFilters = useRef(readBoardFilters(window.location.search)).current;
   const [screen, setScreen] = useState(initialRoute.screen);
   const [queue, setQueue] = useState({ totalOpen: 0, breached: 0, cases: [] });
-  const [sla, setSla] = useState({ referenceNow: null, byPriority: [], breachedCases: [] });
+  const [sla, setSla] = useState({
+    referenceNow: null,
+    byPriority: [],
+    breachedCases: [],
+    csatByCategory: [],
+  });
   const [slaLoading, setSlaLoading] = useState(true);
   const [slaError, setSlaError] = useState(null);
   const [query, setQuery] = useState(initialFilters.query);
@@ -57,6 +62,8 @@ export default function App() {
   const [transitionLoading, setTransitionLoading] = useState(false);
   const [supervisorError, setSupervisorError] = useState(null);
   const [supervisorLoading, setSupervisorLoading] = useState(false);
+  const [csatError, setCsatError] = useState(null);
+  const [csatLoading, setCsatLoading] = useState(false);
   const [applicantError, setApplicantError] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [suggestionLoading, setSuggestionLoading] = useState(false);
@@ -156,6 +163,7 @@ export default function App() {
     setApplicantError(null);
     setTransitionError(null);
     setSupervisorError(null);
+    setCsatError(null);
     setSuggestions([]);
     setSuggestionLoading(false);
     setSuggestionError(null);
@@ -373,6 +381,26 @@ export default function App() {
     [reload, reloadSla, selectedCaseId],
   );
 
+  const recordCsat = useCallback(
+    async ({ score, comment }) => {
+      if (!selectedCaseId) return false;
+      setCsatLoading(true);
+      setCsatError(null);
+      try {
+        const updated = await api.recordCsat(selectedCaseId, { score, comment });
+        setDetail(updated);
+        await reloadSla();
+        return true;
+      } catch (failure) {
+        setCsatError(failure.message);
+        return false;
+      } finally {
+        setCsatLoading(false);
+      }
+    },
+    [reloadSla, selectedCaseId],
+  );
+
   const up = !error && health?.status === "UP";
   const activeNav = screen === "detail" ? "cases" : screen;
 
@@ -462,6 +490,9 @@ export default function App() {
           supervisorError={supervisorError}
           supervisorLoading={supervisorLoading}
           onSupervisor={superviseCase}
+          csatError={csatError}
+          csatLoading={csatLoading}
+          onRecordCsat={recordCsat}
           applicantError={applicantError}
           applicantLoading={applicantLoading}
           loading={detailLoading}

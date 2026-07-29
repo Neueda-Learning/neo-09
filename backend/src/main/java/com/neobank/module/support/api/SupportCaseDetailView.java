@@ -21,5 +21,7 @@ public record SupportCaseDetailView(
         Instant openedAt,
         Instant resolvedAt,
         Instant closedAt,
+        Integer csatScore,
+        String csatComment,
         List<SupportCaseEventView> events) {
 }

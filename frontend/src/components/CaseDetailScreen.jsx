@@ -25,6 +25,9 @@ export default function CaseDetailScreen({
   supervisorError,
   supervisorLoading,
   onSupervisor,
+  csatError,
+  csatLoading,
+  onRecordCsat,
   applicantError,
   applicantLoading,
   loading,
@@ -43,6 +46,8 @@ export default function CaseDetailScreen({
   const [supervisor, setSupervisor] = useState("m.reyes");
   const [supervisorAssignee, setSupervisorAssignee] = useState("");
   const [showSupervisorActions, setShowSupervisorActions] = useState(false);
+  const [csatScore, setCsatScore] = useState("5");
+  const [csatComment, setCsatComment] = useState("");
 
   const timeline = useMemo(
     () =>
@@ -139,6 +144,16 @@ export default function CaseDetailScreen({
       setSupervisorAssignee("");
       setShowSupervisorActions(false);
     }
+  };
+
+  const submitCsat = async (event) => {
+    event.preventDefault();
+    if (!onRecordCsat || !detail) return;
+    const recorded = await onRecordCsat({
+      score: Number(csatScore),
+      comment: csatComment.trim() || null,
+    });
+    if (recorded) setCsatComment("");
   };
 
   return (
@@ -269,6 +284,67 @@ export default function CaseDetailScreen({
                 ["Description", detail.description],
               ]}
             />
+
+            {detail.status === "CLOSED" && (
+              <section className="case-csat" aria-labelledby="case-csat-title">
+                <div className="case-csat-heading">
+                  <div>
+                    <h3 id="case-csat-title">Customer satisfaction</h3>
+                    <p>
+                      A close-time score is recorded once and becomes part of the
+                      case audit trail.
+                    </p>
+                  </div>
+                  {detail.csatScore != null && (
+                    <Badge tone={detail.csatScore >= 4 ? "positive" : "warning"}>
+                      {detail.csatScore} / 5
+                    </Badge>
+                  )}
+                </div>
+
+                {detail.csatScore != null ? (
+                  <div className="case-csat-recorded">
+                    <strong>CSAT recorded</strong>
+                    <span>{detail.csatComment || "No comment provided."}</span>
+                    <small>This response cannot be edited or deleted.</small>
+                  </div>
+                ) : (
+                  <form className="case-csat-form" onSubmit={submitCsat}>
+                    <label>
+                      Score
+                      <select
+                        value={csatScore}
+                        onChange={(event) => setCsatScore(event.target.value)}
+                        disabled={csatLoading}
+                      >
+                        <option value="5">5 — Excellent</option>
+                        <option value="4">4 — Good</option>
+                        <option value="3">3 — Fair</option>
+                        <option value="2">2 — Poor</option>
+                        <option value="1">1 — Very poor</option>
+                      </select>
+                    </label>
+                    <label>
+                      Comment (optional)
+                      <textarea
+                        value={csatComment}
+                        onChange={(event) => setCsatComment(event.target.value)}
+                        disabled={csatLoading}
+                        rows={3}
+                      />
+                    </label>
+                    {csatError && (
+                      <Alert tone="negative" title="CSAT could not be recorded">
+                        {csatError}
+                      </Alert>
+                    )}
+                    <Button type="submit" disabled={csatLoading}>
+                      {csatLoading ? "Recording..." : "Record CSAT"}
+                    </Button>
+                  </form>
+                )}
+              </section>
+            )}
 
             {actions.length > 0 ? (
               <form className="case-transition-form" onSubmit={submitTransition}>

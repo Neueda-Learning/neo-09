@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.regex.Pattern;
@@ -42,6 +43,7 @@ import com.neobank.module.support.api.SupportCaseQueueRow;
 import com.neobank.module.support.api.SupportCaseView;
 import com.neobank.module.support.api.SlaBoardResponse;
 import com.neobank.module.support.api.SlaBreachedCaseView;
+import com.neobank.module.support.api.SlaCategoryCsat;
 import com.neobank.module.support.api.SlaPriorityCount;
 import com.neobank.module.support.model.CaseConfig;
 import com.neobank.module.support.model.CaseEvent;
@@ -254,7 +256,19 @@ public class SupportCaseService {
                 .limit(10)
                 .toList();
 
-        return new SlaBoardResponse(now, byPriority, worstFirst);
+        Map<String, Double> averages = new LinkedHashMap<>();
+        supportCases.findClosedCsatAverages().forEach(row ->
+                averages.put(row.getCategory(), roundOneDecimal(row.getAverageScore())));
+
+        CaseConfig currentConfig = configs.findTopByOrderByVersionDesc()
+                .orElseThrow(() -> new IllegalStateException("no case configuration is available"));
+        Set<String> categories = new TreeSet<>(readCategories(currentConfig));
+        categories.addAll(averages.keySet());
+        List<SlaCategoryCsat> csatByCategory = categories.stream()
+                .map(category -> new SlaCategoryCsat(category, averages.get(category)))
+                .toList();
+
+        return new SlaBoardResponse(now, byPriority, worstFirst, csatByCategory);
     }
 
     @Transactional
@@ -287,6 +301,8 @@ public class SupportCaseService {
                 supportCase.getOpenedAt(),
                 supportCase.getResolvedAt(),
                 supportCase.getClosedAt(),
+                supportCase.getCsatScore(),
+                supportCase.getCsatComment(),
                 events);
     }
 
@@ -474,6 +490,38 @@ public class SupportCaseService {
         return getCase(supportCase.getCaseId());
     }
 
+    @Transactional
+    public SupportCaseDetailView recordCsat(String caseId, int score, String comment) {
+        if (score < 1 || score > 5) {
+            throw new IllegalArgumentException("score must be between 1 and 5");
+        }
+
+        SupportCase supportCase = supportCases.findByCaseIdForUpdate(caseId)
+                .orElseThrow(() -> new NoSuchElementException("case not found: " + caseId));
+        if (!"CLOSED".equals(supportCase.getStatus())) {
+            throw conflict("CSAT can only be recorded for a CLOSED case");
+        }
+        if (supportCase.getCsatScore() != null) {
+            throw conflict("CSAT has already been recorded");
+        }
+
+        String normalizedComment = comment == null || comment.trim().isBlank()
+                ? null
+                : comment.trim();
+        Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
+        supportCase.recordCsat(score, normalizedComment);
+        caseEvents.save(CaseEvent.transition(
+                caseId,
+                "CSAT_RECORDED",
+                null,
+                null,
+                "customer via orchestrator",
+                normalizedComment,
+                now));
+        supportCases.save(supportCase);
+        return getCase(caseId);
+    }
+
     private void validateCategory(String category, CaseConfig config) {
         try {
             Set<String> categories =
@@ -485,6 +533,18 @@ public class SupportCaseService {
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("current category configuration is invalid", ex);
         }
+    }
+
+    private Set<String> readCategories(CaseConfig config) {
+        try {
+            return objectMapper.readValue(config.getCategoriesJson(), CATEGORY_SET);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("current category configuration is invalid", ex);
+        }
+    }
+
+    private Double roundOneDecimal(Double value) {
+        return value == null ? null : Math.round(value * 10.0) / 10.0;
     }
 
     private String normalizeSearchText(String value) {

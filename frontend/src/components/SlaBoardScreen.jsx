@@ -19,6 +19,7 @@ import { priorityTone, time } from "../status.js";
 export default function SlaBoardScreen({ sla, loading, error, info, onOpenCase }) {
   const byPriority = sla?.byPriority ?? [];
   const breachedCases = sla?.breachedCases ?? [];
+  const csatByCategory = sla?.csatByCategory ?? [];
 
   const columns = [
     {
@@ -77,6 +78,33 @@ export default function SlaBoardScreen({ sla, loading, error, info, onOpenCase }
               />
             ))}
           </Grid>
+
+          <section className="sla-csat" aria-labelledby="sla-csat-title">
+            <div className="sla-csat-heading">
+              <h2 id="sla-csat-title">Average CSAT by category</h2>
+              <p>CLOSED cases with a recorded score · one decimal</p>
+            </div>
+            <Grid cols={3} min={180} style={{ marginBottom: "var(--ds-space-6)" }}>
+              {csatByCategory.map((tile) => (
+                <MetricTile
+                  key={tile.category}
+                  label={tile.category.replaceAll("_", " ")}
+                  value={
+                    tile.averageScore == null
+                      ? "—"
+                      : `${Number(tile.averageScore).toFixed(1)} / 5`
+                  }
+                  tone={
+                    tile.averageScore == null
+                      ? undefined
+                      : tile.averageScore < 3
+                        ? "warning"
+                        : "positive"
+                  }
+                />
+              ))}
+            </Grid>
+          </section>
 
           <DataTable
             aria-label="Worst SLA breaches"

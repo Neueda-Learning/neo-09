@@ -232,6 +232,69 @@
   padding: var(--ds-space-3) 0;
 }
 
+.case-csat {
+  margin-top: var(--ds-space-6);
+  padding: var(--ds-space-5);
+  border: var(--ds-border-width) solid var(--ds-color-border);
+  border-left: 3px solid var(--ds-color-accent);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-color-surface-sunken);
+}
+
+.case-csat-heading,
+.sla-csat-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ds-space-4);
+  margin-bottom: var(--ds-space-4);
+}
+
+.case-csat-heading h3,
+.case-csat-heading p,
+.sla-csat-heading h2,
+.sla-csat-heading p {
+  margin: 0;
+}
+
+.case-csat-heading p,
+.sla-csat-heading p,
+.case-csat-recorded small {
+  color: var(--ds-color-text-muted);
+}
+
+.case-csat-recorded,
+.case-csat-form {
+  display: grid;
+  gap: var(--ds-space-3);
+}
+
+.case-csat-form label {
+  display: grid;
+  gap: var(--ds-space-2);
+}
+
+.case-csat-form select,
+.case-csat-form textarea {
+  width: 100%;
+  min-height: var(--ds-control-height);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border: var(--ds-border-width) solid var(--ds-color-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-control-fill);
+  color: var(--ds-color-text);
+  font: inherit;
+}
+
+.case-csat-form textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.sla-csat {
+  margin-bottom: var(--ds-space-2);
+}
+
 @media (max-width: 860px) {
   .app-side-status {
     margin-top: 0;
@@ -257,6 +320,8 @@
 
   .config-section-heading,
   .config-subsection-heading,
+  .case-csat-heading,
+  .sla-csat-heading,
   .case-supervisor-header,
   .case-work-heading {
     align-items: stretch;
