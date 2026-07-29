@@ -16,6 +16,7 @@ import com.neobank.module.support.api.OpenCaseAcknowledgement;
 import com.neobank.module.support.api.OpenCaseRequest;
 import com.neobank.module.support.api.CaseSupervisorRequest;
 import com.neobank.module.support.api.CaseTransitionRequest;
+import com.neobank.module.support.api.SlaBoardResponse;
 import com.neobank.module.support.api.SupportCaseDetailView;
 import com.neobank.module.support.api.SupportCaseQueueResponse;
 import com.neobank.module.support.api.SupportCaseView;
@@ -57,6 +58,11 @@ public class SupportController {
     @GetMapping("/cases/queue")
     public SupportCaseQueueResponse queue() {
         return supportCases.queue();
+    }
+
+    @GetMapping("/sla")
+    public SlaBoardResponse sla() {
+        return supportCases.slaBoard();
     }
 
     @GetMapping("/cases/{caseId}")

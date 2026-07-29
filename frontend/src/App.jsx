@@ -9,6 +9,7 @@ import {
 import CaseBoardScreen from "./components/CaseBoardScreen.jsx";
 import CaseConfigScreen from "./components/CaseConfigScreen.jsx";
 import CaseDetailScreen from "./components/CaseDetailScreen.jsx";
+import SlaBoardScreen from "./components/SlaBoardScreen.jsx";
 import { api } from "./api.js";
 
 const POLL_MS = 2000;
@@ -16,6 +17,7 @@ const HEALTH_MS = 10000;
 
 const SCREENS = [
   { id: "cases", label: "Cases" },
+  { id: "sla", label: "SLA & Breach" },
   { id: "detail", label: "Detail" },
   { id: "config", label: "Configuration" },
 ];
@@ -27,6 +29,9 @@ const SCREENS = [
 export default function App() {
   const [screen, setScreen] = useState("cases");
   const [queue, setQueue] = useState({ totalOpen: 0, breached: 0, cases: [] });
+  const [sla, setSla] = useState({ referenceNow: null, byPriority: [], breachedCases: [] });
+  const [slaLoading, setSlaLoading] = useState(true);
+  const [slaError, setSlaError] = useState(null);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -57,6 +62,17 @@ export default function App() {
       setError(e.message);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const reloadSla = useCallback(async () => {
+    try {
+      setSla(await api.sla());
+      setSlaError(null);
+    } catch (e) {
+      setSlaError(e.message);
+    } finally {
+      setSlaLoading(false);
     }
   }, []);
 
@@ -174,6 +190,12 @@ export default function App() {
     return () => clearInterval(id);
   }, [reload]);
 
+  useEffect(() => {
+    reloadSla();
+    const id = setInterval(reloadSla, POLL_MS);
+    return () => clearInterval(id);
+  }, [reloadSla]);
+
   const refreshHealth = useCallback(async () => {
     try {
       const [h, i] = await Promise.all([api.health(), api.info()]);
@@ -286,6 +308,15 @@ export default function App() {
           applicantNames={applicantNames}
           error={error}
           loading={loading}
+          info={info}
+          onOpenCase={openCase}
+        />
+      )}
+      {screen === "sla" && (
+        <SlaBoardScreen
+          sla={sla}
+          loading={slaLoading}
+          error={slaError}
           info={info}
           onOpenCase={openCase}
         />

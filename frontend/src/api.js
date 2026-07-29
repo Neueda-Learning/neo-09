@@ -43,6 +43,7 @@ export const api = {
     return request(`/api/v1/support/cases?${params}`);
   },
   queue: () => request("/api/v1/support/cases/queue"),
+  sla: () => request("/api/v1/support/sla"),
   getCase: (caseId) => request(`/api/v1/support/cases/${caseId}`),
   transitionCase: (caseId, payload) =>
     request(`/api/v1/support/cases/${caseId}/transition`, {

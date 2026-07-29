@@ -5,7 +5,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +37,9 @@ import com.neobank.module.support.api.SupportCaseEventView;
 import com.neobank.module.support.api.SupportCaseQueueResponse;
 import com.neobank.module.support.api.SupportCaseQueueRow;
 import com.neobank.module.support.api.SupportCaseView;
+import com.neobank.module.support.api.SlaBoardResponse;
+import com.neobank.module.support.api.SlaBreachedCaseView;
+import com.neobank.module.support.api.SlaPriorityCount;
 import com.neobank.module.support.model.CaseConfig;
 import com.neobank.module.support.model.CaseEvent;
 import com.neobank.module.support.model.SupportCase;
@@ -55,6 +60,9 @@ public class SupportCaseService {
         private static final Set<String> SUPERVISOR_ACTIONS =
             Set.of("FORCE_CLOSE", "REASSIGN");
     private static final String NO_APPLICATION_MATCH = "__no_application_match__";
+    /** Weakest to strongest, so index+1 is always the next escalation target. */
+    private static final List<String> PRIORITY_LEVELS_LOW_FIRST = List.of("P3", "P2", "P1");
+    private static final List<String> PRIORITY_LEVELS_HIGH_FIRST = List.of("P1", "P2", "P3");
 
     private final Executor executor;
     private final SupportCaseRepository supportCases;
@@ -171,8 +179,10 @@ public class SupportCaseService {
                         List.copyOf(applicationIds),
                         PageRequest.of(0, limit))
                 .stream()
-                .map(supportCase -> SupportCaseView.of(
-                        supportCase, refreshBreached(supportCase, now)))
+                .map(supportCase -> {
+                    escalateIfNeeded(supportCase, now);
+                    return SupportCaseView.of(supportCase, refreshBreached(supportCase, now));
+                })
                 .toList();
     }
 
@@ -182,6 +192,7 @@ public class SupportCaseService {
         List<SupportCaseQueueRow> allOpenCases = supportCases.findAll().stream()
                 .filter(supportCase -> isOpen(supportCase.getStatus()))
                 .map(supportCase -> {
+                    escalateIfNeeded(supportCase, now);
                     refreshBreached(supportCase, now);
                     return toQueueRow(supportCase, now);
                 })
@@ -198,6 +209,51 @@ public class SupportCaseService {
         return new SupportCaseQueueResponse(allOpenCases.size(), breached, visibleCases);
     }
 
+    /**
+     * {@code GET /sla} (UC 04) — per-priority open/breached tallies plus the worst breaches,
+     * capped at 10, worst (most overdue) first. Runs the same escalation + breach sweep as the
+     * queue over the same open rows, so the two screens never disagree.
+     */
+    @Transactional
+    public SlaBoardResponse slaBoard() {
+        Instant now = clock.instant();
+        Map<String, int[]> tally = new LinkedHashMap<>();
+        for (String priority : PRIORITY_LEVELS_HIGH_FIRST) {
+            tally.put(priority, new int[2]);
+        }
+
+        List<SlaBreachedCaseView> breachedCases = new ArrayList<>();
+        supportCases.findAll().stream()
+                .filter(supportCase -> isOpen(supportCase.getStatus()))
+                .forEach(supportCase -> {
+                    escalateIfNeeded(supportCase, now);
+                    boolean breached = refreshBreached(supportCase, now);
+                    String priority = supportCase.getPriority();
+                    int[] counts = tally.get(priority);
+                    if (counts != null) {
+                        counts[0]++;
+                        if (breached) {
+                            counts[1]++;
+                        }
+                    }
+                    if (breached) {
+                        breachedCases.add(new SlaBreachedCaseView(
+                                supportCase.getCaseId(), priority, overdueHours(supportCase, now)));
+                    }
+                });
+
+        List<SlaPriorityCount> byPriority = PRIORITY_LEVELS_HIGH_FIRST.stream()
+                .map(priority -> new SlaPriorityCount(
+                        priority, tally.get(priority)[0], tally.get(priority)[1]))
+                .toList();
+        List<SlaBreachedCaseView> worstFirst = breachedCases.stream()
+                .sorted(Comparator.comparingDouble(SlaBreachedCaseView::overdueHours).reversed())
+                .limit(10)
+                .toList();
+
+        return new SlaBoardResponse(now, byPriority, worstFirst);
+    }
+
     @Transactional
     public SupportCaseDetailView getCase(String caseId) {
         SupportCase supportCase = supportCases.findByCaseId(caseId)
@@ -206,6 +262,10 @@ public class SupportCaseService {
                 .stream()
                 .map(SupportCaseEventView::of)
                 .toList();
+        Instant now = clock.instant();
+        if (isOpen(supportCase.getStatus())) {
+            escalateIfNeeded(supportCase, now);
+        }
         return new SupportCaseDetailView(
                 supportCase.getCaseId(),
                 supportCase.getStatus(),
@@ -213,7 +273,7 @@ public class SupportCaseService {
                 supportCase.getChannel(),
                 supportCase.getPriority(),
                 supportCase.getSlaDeadline(),
-                refreshBreached(supportCase, clock.instant()),
+                refreshBreached(supportCase, now),
                 supportCase.getApplicationId(),
                 supportCase.getCorrelationId(),
                 supportCase.getConfigVersion(),
@@ -488,6 +548,63 @@ public class SupportCaseService {
 
     private boolean isOpen(String status) {
         return "NEW".equals(status) || "OPEN".equals(status) || "PENDING_CUSTOMER".equals(status);
+    }
+
+    /**
+     * Age escalation sweep (UC 04, rules 1+2): while the case's clock is actually running
+     * (NEW/OPEN — a PENDING_CUSTOMER case is paused, same exclusion as breach) and it is past its
+     * current deadline, raises the priority one level, recomputes the deadline from openedAt +
+     * the new level's SLA hours + the stored total paused minutes, and writes one
+     * PRIORITY_ESCALATED event per level. Stops at P1, and never repeats a level once the case's
+     * priority column already reflects it — so re-running this on every read is safe.
+     */
+    private void escalateIfNeeded(SupportCase supportCase, Instant now) {
+        String priority = supportCase.getPriority();
+        Integer configVersion = supportCase.getConfigVersion();
+        if (priority == null || configVersion == null
+                || !("NEW".equals(supportCase.getStatus()) || "OPEN".equals(supportCase.getStatus()))) {
+            return;
+        }
+
+        Map<String, Integer> slaHours = null;
+        while (true) {
+            int level = PRIORITY_LEVELS_LOW_FIRST.indexOf(supportCase.getPriority());
+            if (level < 0 || level == PRIORITY_LEVELS_LOW_FIRST.size() - 1) {
+                return;
+            }
+            if (supportCase.getSlaDeadline() == null || !now.isAfter(supportCase.getSlaDeadline())) {
+                return;
+            }
+            if (slaHours == null) {
+                CaseConfig config = configs.findById(configVersion).orElse(null);
+                if (config == null) {
+                    log.warn(
+                            "case {} pinned to missing config version {} — skipping age escalation",
+                            supportCase.getCaseId(), configVersion);
+                    return;
+                }
+                try {
+                    slaHours = objectMapper.readValue(config.getSlaHoursJson(), SLA_MAP);
+                } catch (JsonProcessingException ex) {
+                    throw new IllegalStateException("stored sla_hours_json is invalid", ex);
+                }
+            }
+            String fromPriority = supportCase.getPriority();
+            String toPriority = PRIORITY_LEVELS_LOW_FIRST.get(level + 1);
+            Integer hours = slaHours.get(toPriority);
+            if (hours == null) {
+                log.warn(
+                        "case {} config version {} has no sla_hours entry for {} — skipping age escalation",
+                        supportCase.getCaseId(), configVersion, toPriority);
+                return;
+            }
+            Instant newDeadline = supportCase.getOpenedAt()
+                    .plus(hours, ChronoUnit.HOURS)
+                    .plus(supportCase.getPausedMinutes(), ChronoUnit.MINUTES);
+            supportCase.escalate(toPriority, newDeadline);
+            caseEvents.save(CaseEvent.priorityEscalated(
+                    supportCase.getCaseId(), fromPriority, toPriority, now));
+        }
     }
 
     private boolean currentBreach(SupportCase supportCase, Instant now) {
