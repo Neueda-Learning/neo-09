@@ -1,0 +1,26 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-use-json-type-for-keyword-map
+      author: neo-09
+      dbms: mysql
+      changes:
+        - modifyDataType:
+            tableName: case_config
+            columnName: keyword_map_json
+            newDataType: JSON
+      rollback:
+        - modifyDataType:
+            tableName: case_config
+            columnName: keyword_map_json
+            newDataType: TEXT
+
+  - changeSet:
+      id: 008-use-json-type-for-keyword-map-h2
+      author: neo-09
+      dbms: h2
+      changes:
+        - sql:
+            sql: ALTER TABLE case_config ALTER COLUMN keyword_map_json JSON USING keyword_map_json FORMAT JSON
+      rollback:
+        - sql:
+            sql: ALTER TABLE case_config ALTER COLUMN keyword_map_json TEXT USING CAST(keyword_map_json AS VARCHAR)

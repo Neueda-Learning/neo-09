@@ -51,6 +51,9 @@ export default function App() {
   const [supervisorError, setSupervisorError] = useState(null);
   const [supervisorLoading, setSupervisorLoading] = useState(false);
   const [applicantError, setApplicantError] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [suggestionError, setSuggestionError] = useState(null);
   const [health, setHealth] = useState(null);
   const [info, setInfo] = useState(null);
 
@@ -97,9 +100,23 @@ export default function App() {
     setTransitionError(null);
     setSupervisorError(null);
     setApplicant(null);
+    setSuggestions([]);
+    setSuggestionLoading(false);
+    setSuggestionError(null);
     loadApplicant(caseId);
     try {
-      setDetail(await api.getCase(caseId));
+      const loadedDetail = await api.getCase(caseId);
+      setDetail(loadedDetail);
+      if (loadedDetail.category === "OTHER") {
+        setSuggestionLoading(true);
+        try {
+          setSuggestions(await api.suggestCategory(caseId));
+        } catch (suggestionFailure) {
+          setSuggestionError(suggestionFailure.message);
+        } finally {
+          setSuggestionLoading(false);
+        }
+      }
     } catch (e) {
       setDetail(null);
       setDetailError(e.message);
@@ -338,6 +355,9 @@ export default function App() {
           loading={detailLoading}
           detail={detail}
           applicant={applicant}
+          suggestions={suggestions}
+          suggestionLoading={suggestionLoading}
+          suggestionError={suggestionError}
           onViewConfig={openConfig}
         />
       )}

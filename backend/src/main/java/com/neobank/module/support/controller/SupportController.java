@@ -16,6 +16,7 @@ import com.neobank.module.support.api.OpenCaseAcknowledgement;
 import com.neobank.module.support.api.OpenCaseRequest;
 import com.neobank.module.support.api.CaseSupervisorRequest;
 import com.neobank.module.support.api.CaseTransitionRequest;
+import com.neobank.module.support.api.CategorySuggestion;
 import com.neobank.module.support.api.SlaBoardResponse;
 import com.neobank.module.support.api.SupportCaseDetailView;
 import com.neobank.module.support.api.SupportCaseQueueResponse;
@@ -87,6 +88,11 @@ public class SupportController {
                 request.reason(),
                 request.supervisor(),
                 request.assignee());
+    }
+
+    @PostMapping("/cases/{caseId}/suggest-category")
+    public List<CategorySuggestion> suggestCategory(@PathVariable String caseId) {
+        return supportCases.suggestCategory(caseId);
     }
 
     @GetMapping("/cases/{caseId}/applicant")

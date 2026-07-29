@@ -10,11 +10,13 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +35,7 @@ import com.neobank.module.integrations.orchestrator.Application;
 import com.neobank.module.integrations.orchestrator.OrchestratorClient;
 import com.neobank.module.model.Decision;
 import com.neobank.module.support.api.SupportCaseDetailView;
+import com.neobank.module.support.api.CategorySuggestion;
 import com.neobank.module.support.api.SupportCaseEventView;
 import com.neobank.module.support.api.SupportCaseQueueResponse;
 import com.neobank.module.support.api.SupportCaseQueueRow;
@@ -53,6 +56,8 @@ public class SupportCaseService {
     private static final Logger log = LoggerFactory.getLogger(SupportCaseService.class);
     private static final TypeReference<Set<String>> CATEGORY_SET = new TypeReference<>() { };
     private static final TypeReference<Map<String, Integer>> SLA_MAP = new TypeReference<>() { };
+    private static final TypeReference<Map<String, List<String>>> KEYWORD_MAP =
+            new TypeReference<>() { };
     private static final Set<String> CASE_STATUSES =
             Set.of("NEW", "OPEN", "PENDING_CUSTOMER", "RESOLVED", "CLOSED");
     private static final Set<String> ACTIONS =
@@ -297,6 +302,46 @@ public class SupportCaseService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public List<CategorySuggestion> suggestCategory(String caseId) {
+        SupportCase supportCase = supportCases.findByCaseId(caseId)
+                .orElseThrow(() -> new NoSuchElementException("case not found: " + caseId));
+        CaseConfig current = configs.findTopByOrderByVersionDesc()
+                .orElseThrow(() -> new IllegalStateException("no case configuration is available"));
+        if (current.getKeywordMapJson() == null || supportCase.getDescription() == null) {
+            return List.of();
+        }
+
+        try {
+            Map<String, List<String>> keywordMap =
+                    objectMapper.readValue(current.getKeywordMapJson(), KEYWORD_MAP);
+            String description = normalizeSearchText(supportCase.getDescription());
+            if (description.isBlank()) {
+                return List.of();
+            }
+
+            List<CategorySuggestion> suggestions = new ArrayList<>();
+            for (Map.Entry<String, List<String>> entry : keywordMap.entrySet()) {
+                List<String> matched = entry.getValue().stream()
+                        .map(this::normalizeSearchText)
+                        .filter(keyword -> !keyword.isBlank())
+                        .distinct()
+                        .filter(keyword -> containsKeyword(description, keyword))
+                        .toList();
+                if (!matched.isEmpty()) {
+                    suggestions.add(new CategorySuggestion(
+                            entry.getKey(), matched.size(), matched));
+                }
+            }
+            return suggestions.stream()
+                    .sorted(Comparator.comparingInt(CategorySuggestion::score).reversed()
+                            .thenComparing(CategorySuggestion::category))
+                    .toList();
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("current keyword_map_json is invalid", ex);
+        }
+    }
+
     @Transactional
     public SupportCaseDetailView transition(String caseId, String action, String actor, String note) {
         String normalizedAction = action == null ? "" : action.trim().toUpperCase();
@@ -440,6 +485,17 @@ public class SupportCaseService {
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("current category configuration is invalid", ex);
         }
+    }
+
+    private String normalizeSearchText(String value) {
+        return value.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+    }
+
+    private boolean containsKeyword(String description, String keyword) {
+        Pattern boundaryMatch = Pattern.compile(
+                "(?<![\\p{L}\\p{N}])" + Pattern.quote(keyword)
+                        + "(?![\\p{L}\\p{N}])");
+        return boundaryMatch.matcher(description).find();
     }
 
     private void triggerFirstCallbackIfNeeded(SupportCase supportCase, String note, Instant now) {
