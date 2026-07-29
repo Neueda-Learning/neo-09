@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppShell,
   Button,
@@ -11,34 +11,41 @@ import CaseConfigScreen from "./components/CaseConfigScreen.jsx";
 import CaseDetailScreen from "./components/CaseDetailScreen.jsx";
 import SlaBoardScreen from "./components/SlaBoardScreen.jsx";
 import { api } from "./api.js";
+import {
+  boardUrl,
+  localPath,
+  normalizeBasePath,
+  readBoardFilters,
+  readRoute,
+} from "./routing.js";
 
 const POLL_MS = 2000;
 const HEALTH_MS = 10000;
+const BASE_PATH = normalizeBasePath(import.meta.env.BASE_URL);
 
 const SCREENS = [
-  { id: "cases", label: "Cases" },
-  { id: "sla", label: "SLA & Breach" },
-  { id: "detail", label: "Detail" },
-  { id: "config", label: "Configuration" },
+  { id: "cases", label: "Case board", hint: "Queue and search" },
+  { id: "sla", label: "SLA oversight", hint: "Load and breaches" },
+  { id: "config", label: "Configuration", hint: "Policy and history" },
 ];
 
-/**
- * The identity box is driven by `/info`, so the same image still takes its team and service
- * identity from environment configuration rather than hard-coded copy.
- */
 export default function App() {
-  const [screen, setScreen] = useState("cases");
+  const initialRoute = useRef(readRoute(window.location, BASE_PATH)).current;
+  const initialFilters = useRef(readBoardFilters(window.location.search)).current;
+  const [screen, setScreen] = useState(initialRoute.screen);
   const [queue, setQueue] = useState({ totalOpen: 0, breached: 0, cases: [] });
   const [sla, setSla] = useState({ referenceNow: null, byPriority: [], breachedCases: [] });
   const [slaLoading, setSlaLoading] = useState(true);
   const [slaError, setSlaError] = useState(null);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialFilters.query);
+  const [searchStatus, setSearchStatus] = useState(initialFilters.status);
+  const [priority, setPriority] = useState(initialFilters.priority);
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [applicantNames, setApplicantNames] = useState({});
-  const [selectedCaseId, setSelectedCaseId] = useState(null);
-  const [configVersion, setConfigVersion] = useState(null);
+  const [selectedCaseId, setSelectedCaseId] = useState(initialRoute.caseId);
+  const [configVersion, setConfigVersion] = useState(initialRoute.configVersion);
   const [detail, setDetail] = useState(null);
   const [applicant, setApplicant] = useState(null);
   const [applicantLoading, setApplicantLoading] = useState(false);
@@ -53,13 +60,58 @@ export default function App() {
   const [applicantError, setApplicantError] = useState(null);
   const [health, setHealth] = useState(null);
   const [info, setInfo] = useState(null);
+  const boardUrlRef = useRef(boardUrl(initialFilters, BASE_PATH));
+
+  const applyRoute = useCallback((route) => {
+    setScreen(route.screen);
+    setSelectedCaseId(route.caseId);
+    setConfigVersion(route.configVersion);
+  }, []);
+
+  const navigate = useCallback(
+    (path, { replace = false, state = {} } = {}) => {
+      window.history[replace ? "replaceState" : "pushState"](
+        state,
+        "",
+        localPath(path, BASE_PATH),
+      );
+      applyRoute(readRoute(window.location, BASE_PATH));
+      window.scrollTo({ top: 0, behavior: "auto" });
+    },
+    [applyRoute],
+  );
+
+  useEffect(() => {
+    const onPopState = (event) => {
+      applyRoute(readRoute(window.location, BASE_PATH));
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: event.state?.scrollY ?? 0, behavior: "auto" });
+      });
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [applyRoute]);
+
+  useEffect(() => {
+    if (screen !== "cases") return;
+    const nextUrl = boardUrl(
+      { query, status: searchStatus, priority },
+      BASE_PATH,
+    );
+    boardUrlRef.current = nextUrl;
+    window.history.replaceState(
+      { ...window.history.state, scrollY: window.scrollY },
+      "",
+      nextUrl,
+    );
+  }, [priority, query, screen, searchStatus]);
 
   const reload = useCallback(async () => {
     try {
       setQueue(await api.queue());
       setError(null);
-    } catch (e) {
-      setError(e.message);
+    } catch (failure) {
+      setError(failure.message);
     } finally {
       setLoading(false);
     }
@@ -69,49 +121,98 @@ export default function App() {
     try {
       setSla(await api.sla());
       setSlaError(null);
-    } catch (e) {
-      setSlaError(e.message);
+    } catch (failure) {
+      setSlaError(failure.message);
     } finally {
       setSlaLoading(false);
     }
   }, []);
 
   const loadApplicant = useCallback(async (caseId) => {
+    if (!caseId) return;
     setApplicantLoading(true);
     setApplicantError(null);
     try {
       setApplicant(await api.getApplicant(caseId));
-    } catch (applicantFailure) {
+    } catch (failure) {
       setApplicant(null);
-      setApplicantError(applicantFailure.message);
+      setApplicantError(failure.message);
     } finally {
       setApplicantLoading(false);
     }
   }, []);
 
-  const openCase = useCallback(async (caseId) => {
-    setSelectedCaseId(caseId);
-    setScreen("detail");
+  useEffect(() => {
+    if (screen !== "detail" || !selectedCaseId) return;
+    let active = true;
+    setDetail(null);
+    setApplicant(null);
     setDetailLoading(true);
+    setApplicantLoading(true);
     setDetailError(null);
+    setApplicantError(null);
     setTransitionError(null);
     setSupervisorError(null);
-    setApplicant(null);
-    loadApplicant(caseId);
-    try {
-      setDetail(await api.getCase(caseId));
-    } catch (e) {
-      setDetail(null);
-      setDetailError(e.message);
-    } finally {
-      setDetailLoading(false);
-    }
-  }, [loadApplicant]);
 
-  const openConfig = useCallback((version = null) => {
-    setConfigVersion(version);
-    setScreen("config");
-  }, []);
+    api.getCase(selectedCaseId)
+      .then((result) => {
+        if (active) setDetail(result);
+      })
+      .catch((failure) => {
+        if (active) setDetailError(failure.message);
+      })
+      .finally(() => {
+        if (active) setDetailLoading(false);
+      });
+
+    api.getApplicant(selectedCaseId)
+      .then((result) => {
+        if (active) setApplicant(result);
+      })
+      .catch((failure) => {
+        if (active) setApplicantError(failure.message);
+      })
+      .finally(() => {
+        if (active) setApplicantLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [screen, selectedCaseId]);
+
+  const openCase = useCallback((caseId) => {
+    const returnTo =
+      window.location.pathname + window.location.search + window.location.hash;
+    window.history.replaceState(
+      { ...window.history.state, scrollY: window.scrollY },
+      "",
+      returnTo,
+    );
+    navigate(`/cases/${encodeURIComponent(caseId)}`, {
+      state: {
+        returnTo,
+        returnLabel: screen === "sla" ? "SLA oversight" : "case board",
+      },
+    });
+  }, [navigate, screen]);
+
+  const backFromCase = useCallback(() => {
+    if (window.history.state?.returnTo) {
+      window.history.back();
+    } else {
+      window.history.pushState({}, "", boardUrlRef.current);
+      applyRoute(readRoute(window.location, BASE_PATH));
+    }
+  }, [applyRoute]);
+
+  const openConfig = useCallback(
+    (version = null) => {
+      const queryString = version == null ? "" : `?version=${version}`;
+      navigate(`/config${queryString}`);
+    },
+    [navigate],
+  );
 
   useEffect(() => {
     const normalized = query.trim();
@@ -123,21 +224,22 @@ export default function App() {
     }
 
     let active = true;
-    const id = setTimeout(async () => {
+    const id = window.setTimeout(async () => {
       setSearchLoading(true);
       try {
         const matches = await api.searchCases({
           query: normalized,
+          status: searchStatus || undefined,
           limit: 10,
         });
         if (active) {
           setSearchResults(matches);
           setSearchError(null);
         }
-      } catch (searchFailure) {
+      } catch (failure) {
         if (active) {
           setSearchResults([]);
-          setSearchError(searchFailure.message);
+          setSearchError(failure.message);
         }
       } finally {
         if (active) setSearchLoading(false);
@@ -146,9 +248,9 @@ export default function App() {
 
     return () => {
       active = false;
-      clearTimeout(id);
+      window.clearTimeout(id);
     };
-  }, [query]);
+  }, [query, searchStatus]);
 
   const visibleCases = query.trim() ? searchResults : queue.cases;
   const visibleCaseKey = visibleCases
@@ -162,10 +264,7 @@ export default function App() {
         visibleCases.slice(0, 10).map(async (supportCase) => {
           try {
             const application = await api.getApplicant(supportCase.caseId);
-            return [
-              supportCase.caseId,
-              application.applicant?.fullName ?? "—",
-            ];
+            return [supportCase.caseId, application.applicant?.fullName ?? "—"];
           } catch {
             return [supportCase.caseId, "—"];
           }
@@ -174,11 +273,8 @@ export default function App() {
       if (active) setApplicantNames(Object.fromEntries(entries));
     };
 
-    if (visibleCases.length === 0) {
-      setApplicantNames({});
-    } else {
-      hydrateNames();
-    }
+    if (visibleCases.length === 0) setApplicantNames({});
+    else hydrateNames();
     return () => {
       active = false;
     };
@@ -186,21 +282,21 @@ export default function App() {
 
   useEffect(() => {
     reload();
-    const id = setInterval(reload, POLL_MS);
-    return () => clearInterval(id);
+    const id = window.setInterval(reload, POLL_MS);
+    return () => window.clearInterval(id);
   }, [reload]);
 
   useEffect(() => {
     reloadSla();
-    const id = setInterval(reloadSla, POLL_MS);
-    return () => clearInterval(id);
+    const id = window.setInterval(reloadSla, POLL_MS);
+    return () => window.clearInterval(id);
   }, [reloadSla]);
 
   const refreshHealth = useCallback(async () => {
     try {
-      const [h, i] = await Promise.all([api.health(), api.info()]);
-      setHealth(h);
-      setInfo(i);
+      const [healthResult, infoResult] = await Promise.all([api.health(), api.info()]);
+      setHealth(healthResult);
+      setInfo(infoResult);
     } catch {
       setHealth(null);
     }
@@ -208,37 +304,33 @@ export default function App() {
 
   useEffect(() => {
     refreshHealth();
-    const id = setInterval(refreshHealth, HEALTH_MS);
-    return () => clearInterval(id);
+    const id = window.setInterval(refreshHealth, HEALTH_MS);
+    return () => window.clearInterval(id);
   }, [refreshHealth]);
-
-  const up = !error && health?.status === "UP";
 
   const transitionCase = useCallback(
     async ({ action, actor, note }) => {
-      if (!selectedCaseId) return;
+      if (!selectedCaseId) return false;
       setTransitionLoading(true);
       setTransitionError(null);
       try {
-        const updated = await api.transitionCase(selectedCaseId, {
-          action,
-          actor,
-          note,
-        });
+        const updated = await api.transitionCase(selectedCaseId, { action, actor, note });
         setDetail(updated);
-        await reload();
+        await Promise.all([reload(), reloadSla()]);
+        return true;
       } catch (failure) {
         setTransitionError(failure.message);
+        return false;
       } finally {
         setTransitionLoading(false);
       }
     },
-    [reload, selectedCaseId],
+    [reload, reloadSla, selectedCaseId],
   );
 
   const superviseCase = useCallback(
     async ({ action, reason, supervisor, assignee }) => {
-      if (!selectedCaseId) return;
+      if (!selectedCaseId) return false;
       setSupervisorLoading(true);
       setSupervisorError(null);
       try {
@@ -249,44 +341,56 @@ export default function App() {
           assignee,
         });
         setDetail(updated);
-        await reload();
+        await Promise.all([reload(), reloadSla()]);
+        return true;
       } catch (failure) {
         setSupervisorError(failure.message);
+        return false;
       } finally {
         setSupervisorLoading(false);
       }
     },
-    [reload, selectedCaseId],
+    [reload, reloadSla, selectedCaseId],
   );
+
+  const up = !error && health?.status === "UP";
+  const activeNav = screen === "detail" ? "cases" : screen;
 
   return (
     <AppShell
+      wide
       side={
         <>
           <SideBrand
-            brand={info?.team ?? "Team"}
-            product={info?.service ?? "Module"}
-            meta={info ? `${info.serviceId} · ${info.domain}` : undefined}
+            brand={info?.team ?? "Operations"}
+            product="Support Control"
+            meta={info ? `${info.serviceId} · ${info.domain}` : "Customer case management"}
           />
           <SideNav
             items={SCREENS}
-            active={screen}
+            active={activeNav}
             onSelect={(nextScreen) => {
-              if (nextScreen === "config") setConfigVersion(null);
-              setScreen(nextScreen);
+              if (nextScreen === "cases") {
+                window.history.pushState({}, "", boardUrlRef.current);
+                applyRoute(readRoute(window.location, BASE_PATH));
+              } else {
+                navigate(`/${nextScreen}`);
+              }
             }}
           />
-          {/* Health and refresh lived in the top bar; with the bar gone they belong beside the
-              menu rather than inside it — a menu item that is not a screen is a trap. */}
           <div className="app-side-status">
-            <StatusPill tone={up ? "positive" : "negative"}>
-              {up ? "Up" : "Down"}
-            </StatusPill>
+            <div>
+              <span className="app-side-status__label">Service status</span>
+              <StatusPill tone={up ? "positive" : "negative"}>
+                {up ? "Operational" : "Unavailable"}
+              </StatusPill>
+            </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => {
                 reload();
+                reloadSla();
                 refreshHealth();
               }}
             >
@@ -295,13 +399,17 @@ export default function App() {
           </div>
         </>
       }
-      footer="Customer support · cases come from the orchestrator, never from this UI"
+      footer="Support Control · application data is fetched live and never copied into this service"
     >
       {screen === "cases" && (
         <CaseBoardScreen
           queue={queue}
           query={query}
           onQueryChange={setQuery}
+          searchStatus={searchStatus}
+          onSearchStatusChange={setSearchStatus}
+          priority={priority}
+          onPriorityChange={setPriority}
           searchResults={searchResults}
           searchLoading={searchLoading}
           searchError={searchError}
@@ -324,7 +432,8 @@ export default function App() {
       {screen === "detail" && (
         <CaseDetailScreen
           caseId={selectedCaseId}
-          onBack={() => setScreen("cases")}
+          backLabel={window.history.state?.returnLabel ?? "case board"}
+          onBack={backFromCase}
           onRetry={() => loadApplicant(selectedCaseId)}
           error={detailError}
           transitionError={transitionError}

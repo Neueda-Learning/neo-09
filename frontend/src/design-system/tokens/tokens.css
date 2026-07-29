@@ -73,12 +73,12 @@
   /* The SideNav column. Wide enough for a two-word screen name plus its hint without wrapping,
      narrow enough that the content column still reads as the subject of the page. */
   --ds-side-width: 232px;
-  --ds-page-width: 1400px;
-  --ds-page-pad-x: var(--ds-space-7);
-  --ds-page-pad-y: var(--ds-space-6);
-  --ds-control-height: 34px;
-  --ds-control-height-sm: 28px;
-  --ds-control-height-lg: 40px;
+  --ds-page-width: 1500px;
+  --ds-page-pad-x: var(--ds-space-8);
+  --ds-page-pad-y: var(--ds-space-7);
+  --ds-control-height: 38px;
+  --ds-control-height-sm: 32px;
+  --ds-control-height-lg: 42px;
 
   /* -- Motion — short, and only on colour ---------------------------------
    * Nothing in the system moves, scales or bounces; transitions exist so a

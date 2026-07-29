@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   Alert,
   Badge,
@@ -10,6 +10,7 @@ import {
   MetricTile,
   PageHeader,
   SearchInput,
+  Select,
   Spinner,
   Toolbar,
 } from "../design-system";
@@ -21,6 +22,10 @@ export default function CaseBoardScreen({
   queue,
   query,
   onQueryChange,
+  searchStatus,
+  onSearchStatusChange,
+  priority,
+  onPriorityChange,
   searchResults,
   searchLoading,
   searchError,
@@ -30,8 +35,6 @@ export default function CaseBoardScreen({
   info,
   onOpenCase,
 }) {
-  const [priority, setPriority] = useState("All");
-
   const searching = Boolean(query.trim());
   const rows = searching ? searchResults : (queue?.cases ?? []);
 
@@ -44,7 +47,6 @@ export default function CaseBoardScreen({
       }, {}),
     [rows],
   );
-
   const matches = useMemo(() => {
     return rows.filter(
       (supportCase) =>
@@ -107,33 +109,22 @@ export default function CaseBoardScreen({
       render: (supportCase) =>
         supportCase.slaDeadline ? time(supportCase.slaDeadline) : "Pricing…",
     },
-    {
-      key: 'details',
-      header: 'Details',
-      tight: true,
-      render: (supportCase) => (
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={(event) => {
-            event.stopPropagation();
-            onOpenCase?.(supportCase.caseId);
-          }}
-        >
-          View
-        </Button>
-      ),
-    },
   ];
+
+  const clearFilters = () => {
+    onQueryChange("");
+    onSearchStatusChange("");
+    onPriorityChange("All");
+  };
 
   return (
     <>
       <PageHeader
-        title="Support cases"
-        lede="new customer cases are committed before acknowledgement, then priced from the current SLA configuration"
+        title="Case board"
+        lede="Prioritised operational queue with live applicant hydration and capped search results."
         meta={
           info
-            ? `${info.serviceId} · ${info.domain} · v${info.version} · showing the latest 10 cases`
+            ? `${info.serviceId} · ${info.domain} · v${info.version} · maximum 10 rows`
             : undefined
         }
       />
@@ -143,12 +134,6 @@ export default function CaseBoardScreen({
           {error} — the board retries every two seconds.
         </Alert>
       )}
-      {searchError && (
-        <Alert tone="warning" title="Could not complete that search">
-          {searchError}. Try again when the orchestrator is available.
-        </Alert>
-      )}
-
       <Grid cols={3} min={160} style={{ marginBottom: "var(--ds-space-6)" }}>
         <MetricTile label="Open cases" value={queue?.totalOpen ?? 0} />
         <MetricTile
@@ -157,27 +142,58 @@ export default function CaseBoardScreen({
           tone="negative"
         />
         <MetricTile
-          label="P1 priority"
-          value={counts.P1 ?? 0}
-          tone="negative"
+          label="Visible queue rows"
+          value={queue?.cases?.length ?? 0}
+          hint="Maximum 10 · worst first"
         />
       </Grid>
 
       <Toolbar>
         <SearchInput
           grow
-          placeholder="Case ID, application ID or applicant name"
+          placeholder="Search case ID, application ID or customer name"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
           aria-label="Search support cases"
         />
+        <label className="case-board-status-filter">
+          <span>Status</span>
+          <Select
+            size="sm"
+            value={searchStatus}
+            onChange={(event) => onSearchStatusChange(event.target.value)}
+            disabled={!searching}
+            aria-label="Filter search results by status"
+            options={[
+              { value: "", label: "All statuses" },
+              "NEW",
+              "OPEN",
+              "PENDING_CUSTOMER",
+              "RESOLVED",
+              "CLOSED",
+            ]}
+          />
+        </label>
         <ChipGroup
           options={PRIORITIES}
           value={priority}
-          onChange={setPriority}
+          onChange={onPriorityChange}
           counts={counts}
         />
+        {(searching || searchStatus || priority !== "All") && (
+          <Button size="sm" variant="ghost" onClick={clearFilters}>
+            Clear filters
+          </Button>
+        )}
       </Toolbar>
+
+      <div className="case-search-guidance" aria-live="polite">
+        {searching && query.trim().length < 3
+          ? "Short searches can be broad. Add more characters for a more precise result."
+          : searching && searchResults.length === 10
+            ? "10 results shown, the search limit. Refine the case ID, application ID or customer name to narrow the list."
+            : "Search accepts case ID, application ID or customer name. Clear the search to return to the priority queue."}
+      </div>
 
       {loading || searchLoading ? (
         <div className="case-board-loading" aria-live="polite">
@@ -188,19 +204,32 @@ export default function CaseBoardScreen({
             {searching ? "Searching support cases…" : "Loading support cases…"}
           </span>
         </div>
+      ) : searchError ? (
+        <EmptyState
+          title="Search is temporarily unavailable"
+          action={
+            <Button variant="secondary" size="sm" onClick={clearFilters}>
+              Return to queue
+            </Button>
+          }
+        >
+          {searchError}. The queue remains available while the applicant service
+          recovers.
+        </EmptyState>
       ) : (
         <DataTable
+          aria-label={searching ? "Support case search results" : "Support case priority queue"}
           columns={columns}
           rows={matches}
-          total={
-            searching ? matches.length : (queue?.totalOpen ?? matches.length)
-          }
+          total={matches.length}
           rowKey={(supportCase) => supportCase.caseId}
           onRowClick={(supportCase) => onOpenCase?.(supportCase.caseId)}
           footnote={
             searching
-              ? "search results newest first · API capped at 10"
-              : "priority queue · worst first · API capped at 10"
+              ? searchResults.length === 10
+                ? "search results newest first · 10-row API limit reached — refine your search"
+                : "search results newest first · API capped at 10"
+              : "priority queue · breached first, then deadline · API capped at 10"
           }
           empty={
             <EmptyState
@@ -215,7 +244,10 @@ export default function CaseBoardScreen({
                   customer journey is the only intake path.
                 </>
               ) : (
-                <>Refine the search or try a case or application ID.</>
+                <>
+                  No matching case was found. Try a more precise case ID,
+                  application ID, or a different customer name.
+                </>
               )}
             </EmptyState>
           }

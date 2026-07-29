@@ -76,12 +76,12 @@
   flex: 1;
   display: grid;
   grid-template-columns: var(--ds-side-width) minmax(0, 1fr);
-  align-items: start;
-  gap: var(--ds-space-6);
+  align-items: stretch;
   width: 100%;
-  max-width: var(--ds-page-width);
-  margin: 0 auto;
-  padding: var(--ds-page-pad-y) var(--ds-page-pad-x) var(--ds-space-10);
+  max-width: none;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
 }
 
 .ds-shell--wide.ds-shell--sided .ds-shell__body {
@@ -90,8 +90,10 @@
 
 /* The column already carries the page padding, so main must not pay it twice. */
 .ds-shell--sided .ds-shell__main {
-  max-width: none;
-  padding: 0;
+  width: 100%;
+  max-width: var(--ds-page-width);
+  margin: 0 auto;
+  padding: var(--ds-page-pad-y) var(--ds-page-pad-x) var(--ds-space-10);
 }
 
 .ds-shell__side {
@@ -99,19 +101,26 @@
   flex-direction: column;
   gap: var(--ds-space-4);
   position: sticky;
-  /* Clears a TopNav if one is ever used above a sided shell; harmless when there is none. */
-  top: var(--ds-page-pad-y);
+  top: 0;
+  height: 100vh;
+  padding: var(--ds-space-6) var(--ds-space-4);
+  background: var(--ds-color-nav);
+  color: var(--ds-color-nav-ink);
+  border-right: var(--ds-border-width) solid var(--ds-color-nav-hover);
+  z-index: var(--ds-z-nav);
 }
 
 /* One breakpoint, and it stacks. A menu that becomes a 90px-wide column of wrapped words is
    worse than a menu above the content. */
-@media (max-width: 720px) {
+@media (max-width: 860px) {
   .ds-shell--sided .ds-shell__body {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .ds-shell__side {
     position: static;
+    height: auto;
+    padding: var(--ds-space-4);
   }
 }
 
@@ -120,12 +129,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-1);
-  padding: var(--ds-space-4) var(--ds-space-5);
-  border-radius: var(--ds-radius-lg);
-  background: var(--ds-surface-fill);
-  backdrop-filter: var(--ds-surface-backdrop);
-  border: var(--ds-border-width) solid var(--ds-surface-border);
-  box-shadow: var(--ds-surface-shadow);
+  padding: var(--ds-space-3) var(--ds-space-3) var(--ds-space-5);
+  border-bottom: var(--ds-border-width) solid var(--ds-color-nav-divider);
 }
 
 /* The owner: small, uppercase, tracked — the quiet half of the lock-up, as in TopNav. */
@@ -134,7 +139,7 @@
   font-weight: var(--ds-weight-semibold);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ds-color-text-muted);
+  color: var(--ds-color-nav-ink-muted);
 }
 
 /* The app's name. Sans, NOT the display serif, even though this is a heading-ish line.
@@ -149,15 +154,15 @@
  * theme/glass.css and .ds-metric__value — arrived at again for a different element. */
 .ds-sidebrand__product {
   font-family: var(--ds-font-sans);
-  font-size: var(--ds-text-xl);
+  font-size: var(--ds-text-lg);
   font-weight: var(--ds-weight-semibold);
   line-height: 1.15;
-  color: var(--ds-color-text);
+  color: var(--ds-color-nav-ink);
 }
 
 .ds-sidebrand__meta {
   font-size: var(--ds-text-xs);
-  color: var(--ds-color-text-muted);
+  color: var(--ds-color-nav-ink-muted);
 }
 
 /* -- SideNav -------------------------------------------------------------- */
@@ -165,38 +170,34 @@
   display: flex;
   flex-direction: column;
   gap: var(--ds-space-1);
-  padding: var(--ds-space-3);
-  border-radius: var(--ds-radius-lg);
-  background: var(--ds-surface-fill);
-  backdrop-filter: var(--ds-surface-backdrop);
-  border: var(--ds-border-width) solid var(--ds-surface-border);
-  box-shadow: var(--ds-surface-shadow);
+  padding: var(--ds-space-2) 0;
 }
 
 .ds-side__item {
   appearance: none;
   border: 0;
   background: transparent;
-  color: var(--ds-color-text-secondary);
+  color: var(--ds-color-nav-ink-muted);
   display: flex;
   flex-direction: column;
   gap: 2px;
   text-align: left;
-  padding: var(--ds-space-3) var(--ds-space-4);
+  padding: var(--ds-space-3) var(--ds-space-3);
   border-radius: var(--ds-radius-md);
   font: inherit;
   cursor: pointer;
 }
 
 .ds-side__item:hover:not(:disabled) {
-  background: var(--ds-color-surface-hover);
-  color: var(--ds-color-text);
+  background: var(--ds-color-nav-hover);
+  color: var(--ds-color-nav-ink);
 }
 
 .ds-side__item[aria-current='page'] {
-  background: var(--ds-color-accent-soft);
-  color: var(--ds-color-accent-text);
+  background: var(--ds-color-nav-selected);
+  color: var(--ds-color-nav-ink);
   font-weight: var(--ds-weight-semibold);
+  box-shadow: inset 3px 0 0 var(--ds-color-accent);
 }
 
 .ds-side__item:focus-visible {
@@ -216,7 +217,7 @@
 
 .ds-side__hint {
   font-size: var(--ds-text-2xs);
-  color: var(--ds-color-text-muted);
+  color: var(--ds-color-nav-ink-muted);
 }
 
 /* -- TopNav --------------------------------------------------------------- */
@@ -302,7 +303,9 @@
   align-items: flex-start;
   gap: var(--ds-space-4);
   flex-wrap: wrap;
-  margin-bottom: var(--ds-space-5);
+  margin-bottom: var(--ds-space-6);
+  padding-bottom: var(--ds-space-5);
+  border-bottom: var(--ds-border-width) solid var(--ds-color-border-subtle);
 }
 
 .ds-page-head__text {
@@ -319,7 +322,7 @@
 
 .ds-page-head__title {
   font-family: var(--ds-font-display, inherit);
-  font-size: var(--ds-text-2xl);
+  font-size: var(--ds-text-3xl);
   font-weight: var(--ds-display-weight);
   letter-spacing: var(--ds-tracking-tight);
   line-height: var(--ds-leading-tight);
@@ -332,6 +335,7 @@
 .ds-page-head__lede {
   color: var(--ds-color-text-muted);
   font-size: var(--ds-text-md);
+  margin-top: var(--ds-space-1);
 }
 
 .ds-page-head__meta {
@@ -344,6 +348,32 @@
   display: flex;
   align-items: center;
   gap: var(--ds-space-2);
+}
+
+@media (max-width: 860px) {
+  .ds-side {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .ds-side__item {
+    min-width: max-content;
+  }
+
+  .ds-sidebrand {
+    padding-bottom: var(--ds-space-3);
+  }
+}
+
+@media (max-width: 640px) {
+  .ds-shell--sided .ds-shell__main {
+    padding: var(--ds-space-5) var(--ds-space-4) var(--ds-space-8);
+  }
+
+  .ds-page-head__actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
 }
 
 /* -- Toolbar -------------------------------------------------------------- */

@@ -100,11 +100,11 @@
   gap: var(--ds-space-1);
   padding: 2px var(--ds-space-3);
   border: var(--ds-border-width) solid var(--ds-badge-border);
-  border-radius: var(--ds-radius-pill);
+  border-radius: var(--ds-radius-sm);
   background: var(--ds-badge-surface);
   color: var(--ds-badge-text);
   font-size: var(--ds-text-xs);
-  font-weight: var(--ds-weight-bold);
+  font-weight: var(--ds-weight-semibold);
   letter-spacing: var(--ds-tracking-label);
   text-transform: uppercase;
   white-space: nowrap;
