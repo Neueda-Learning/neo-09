@@ -120,8 +120,8 @@ export default function CaseBoardScreen({
   return (
     <>
       <PageHeader
-        title="Case board"
-        lede="Prioritised operational queue with live applicant hydration and capped search results."
+        title="Operations overview"
+        lede="A live view of customer support demand, urgency and response health."
         meta={
           info
             ? `${info.serviceId} · ${info.domain} · v${info.version} · maximum 10 rows`
@@ -134,19 +134,32 @@ export default function CaseBoardScreen({
           {error} — the board retries every two seconds.
         </Alert>
       )}
-      <Grid cols={3} min={160} style={{ marginBottom: "var(--ds-space-6)" }}>
+      <Grid
+        cols={3}
+        min={180}
+        className="queue-number-board"
+      >
         <MetricTile label="Open cases" value={queue?.totalOpen ?? 0} />
         <MetricTile
           label="Breached"
           value={queue?.breached ?? 0}
-          tone="negative"
+          tone="warning"
         />
         <MetricTile
           label="Visible queue rows"
           value={queue?.cases?.length ?? 0}
           hint="Maximum 10 · worst first"
+          tone="neutral"
         />
       </Grid>
+
+      <div className="queue-list-heading">
+        <div>
+          <h2>Case queue</h2>
+          <p>Search, filter and open a case for the full service history.</p>
+        </div>
+        <span>{matches.length} visible</span>
+      </div>
 
       <Toolbar>
         <SearchInput

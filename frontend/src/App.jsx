@@ -23,10 +23,39 @@ const POLL_MS = 2000;
 const HEALTH_MS = 10000;
 const BASE_PATH = normalizeBasePath(import.meta.env.BASE_URL);
 
+function NavIcon({ name }) {
+  const paths = {
+    cases: (
+      <>
+        <rect x="3" y="4" width="18" height="16" rx="3" />
+        <path d="M7 9h10M7 14h6" />
+      </>
+    ),
+    sla: (
+      <>
+        <path d="M12 3v9l5 3" />
+        <circle cx="12" cy="12" r="9" />
+      </>
+    ),
+    config: (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.1A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.1A1.7 1.7 0 0 0 15.4 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.13.4.36.75.68 1 .3.24.7.38 1.1.4h.1v4h-.1A1.7 1.7 0 0 0 19.4 15Z" />
+      </>
+    ),
+  };
+
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      {paths[name]}
+    </svg>
+  );
+}
+
 const SCREENS = [
-  { id: "cases", label: "Case board", hint: "Queue and search" },
-  { id: "sla", label: "SLA oversight", hint: "Load and breaches" },
-  { id: "config", label: "Configuration", hint: "Policy and history" },
+  { id: "cases", label: "Case board", hint: "Queue and search", icon: <NavIcon name="cases" /> },
+  { id: "sla", label: "SLA oversight", hint: "Load and breaches", icon: <NavIcon name="sla" /> },
+  { id: "config", label: "Configuration", hint: "Policy and history", icon: <NavIcon name="config" /> },
 ];
 
 export default function App() {
@@ -410,9 +439,9 @@ export default function App() {
       side={
         <>
           <SideBrand
-            brand={info?.team ?? "Operations"}
-            product="Support Control"
-            meta={info ? `${info.serviceId} · ${info.domain}` : "Customer case management"}
+            brand="Neo Bank"
+            product="Customer Support"
+            meta={info ? `${info.team ?? "Operations"} · ${info.domain}` : "Customer case management"}
           />
           <SideNav
             items={SCREENS}
@@ -447,7 +476,7 @@ export default function App() {
           </div>
         </>
       }
-      footer="Support Control · application data is fetched live and never copied into this service"
+      footer="Customer Support · application data is fetched live and never copied into this service"
     >
       {screen === "cases" && (
         <CaseBoardScreen
