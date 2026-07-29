@@ -27,6 +27,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -319,15 +321,43 @@ public class SupportCaseService {
                 events);
     }
 
+    /**
+     * The applicant behind a case, fetched live — this module stores the id, never the name.
+     *
+     * <p>A 404 from the orchestrator is the common failure and it is a <em>data</em> problem, not a
+     * broken endpoint: only a case created from a real dispatch has an application the orchestrator
+     * has ever heard of. A case opened by hand, seeded for a demo, or bridged from a dispatch the
+     * orchestrator has since forgotten carries an id nothing can resolve. The message says which,
+     * because "not found" alone sends people looking for the bug in the wrong repository.</p>
+     */
     public Application applicant(String caseId) {
         SupportCase supportCase = supportCases.findByCaseId(caseId)
                 .orElseThrow(() -> new NoSuchElementException("case not found: " + caseId));
+        String applicationId = supportCase.getApplicationId();
+        if (applicationId == null || applicationId.isBlank()) {
+            throw new NoSuchElementException(
+                    "case " + caseId + " is not linked to an application, so there is no applicant "
+                            + "to fetch");
+        }
         try {
-            return orchestrator.application(supportCase.getApplicationId());
-        } catch (org.springframework.web.client.HttpClientErrorException.NotFound ex) {
-            throw new NoSuchElementException("application not found — link may be stale");
+            return orchestrator.application(applicationId);
+        } catch (HttpClientErrorException.NotFound ex) {
+            throw new NoSuchElementException("the orchestrator has no application " + applicationId
+                    + " — this case was not created from a dispatch, so its applicant cannot be "
+                    + "fetched");
+        } catch (HttpStatusCodeException ex) {
+            // Anything else it answered is about the orchestrator, not about this case. A 405 here
+            // means it is an old build with no lookup endpoint, which is worth saying out loud.
+            throw new ApplicantLookupFailedException("the orchestrator answered "
+                    + ex.getStatusCode() + " when asked for application " + applicationId);
         } catch (RestClientException ex) {
-            throw new ApplicantLookupFailedException("application lookup unavailable");
+            // Name the exception as well as its message: an UnknownHostException's message is the
+            // bare hostname, and "…to fetch application SIM-01: sidecar" explains nothing on its own.
+            Throwable cause = ex.getMostSpecificCause();
+            String detail = cause.getClass().getSimpleName()
+                    + (cause.getMessage() == null ? "" : ": " + cause.getMessage());
+            throw new ApplicantLookupFailedException("could not reach the orchestrator to fetch "
+                    + "application " + applicationId + " (" + detail + ")");
         }
     }
 

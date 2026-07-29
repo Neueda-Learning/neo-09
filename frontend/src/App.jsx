@@ -23,6 +23,13 @@ const POLL_MS = 2000;
 const HEALTH_MS = 10000;
 const BASE_PATH = normalizeBasePath(import.meta.env.BASE_URL);
 
+// Applicant lookups fail in two different ways and the UI must not conflate them: a 404 means no
+// such application exists in the orchestrator (this case was never created from a dispatch), and
+// anything else means the lookup itself broke. api.js puts the status on the error; keep it.
+function lookupFailure(failure) {
+  return { status: failure.status, message: failure.message };
+}
+
 function NavIcon({ name }) {
   const paths = {
     cases: (
@@ -175,7 +182,7 @@ export default function App() {
       setApplicant(await api.getApplicant(caseId));
     } catch (failure) {
       setApplicant(null);
-      setApplicantError(failure.message);
+      setApplicantError(lookupFailure(failure));
     } finally {
       setApplicantLoading(false);
     }
@@ -227,7 +234,7 @@ export default function App() {
         if (active) setApplicant(result);
       })
       .catch((failure) => {
-        if (active) setApplicantError(failure.message);
+        if (active) setApplicantError(lookupFailure(failure));
       })
       .finally(() => {
         if (active) setApplicantLoading(false);
@@ -322,9 +329,21 @@ export default function App() {
         visibleCases.slice(0, 10).map(async (supportCase) => {
           try {
             const application = await api.getApplicant(supportCase.caseId);
-            return [supportCase.caseId, application.applicant?.fullName ?? "—"];
-          } catch {
-            return [supportCase.caseId, "—"];
+            return [
+              supportCase.caseId,
+              { label: application.applicant?.fullName ?? "—" },
+            ];
+          } catch (failure) {
+            // Never swallow this to "—": ten silent failures look like ten slow loads. Say
+            // which kind, and keep the backend's sentence in the tooltip.
+            return [
+              supportCase.caseId,
+              {
+                label: failure.status === 404 ? "not dispatched" : "unavailable",
+                detail: failure.message,
+                failed: true,
+              },
+            ];
           }
         }),
       );

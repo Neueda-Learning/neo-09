@@ -288,6 +288,14 @@
   color: var(--ds-color-text-muted);
 }
 
+/* An applicant we could not fetch. Muted and italic so the board reads as "no name here" rather
+   than as a name — and it carries the backend's reason in its title attribute. */
+.case-board-applicant-missing {
+  color: var(--ds-color-text-muted);
+  font-style: italic;
+  cursor: help;
+}
+
 .case-search-guidance {
   min-height: 20px;
   margin: calc(-1 * var(--ds-space-3)) 0 var(--ds-space-4);
