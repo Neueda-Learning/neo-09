@@ -1,10 +1,12 @@
 package com.neobank.module.support.repository;
 
 import com.neobank.module.support.model.SupportCase;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -14,8 +16,21 @@ public interface SupportCaseRepository extends JpaRepository<SupportCase, Long> 
 
     Optional<SupportCase> findByCaseId(String caseId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select supportCase from SupportCase supportCase where supportCase.caseId = :caseId")
+    Optional<SupportCase> findByCaseIdForUpdate(@Param("caseId") String caseId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select supportCase
+            from SupportCase supportCase
+            where supportCase.status in ('NEW', 'OPEN', 'PENDING_CUSTOMER')
+            """)
+    List<SupportCase> findAllOpenForUpdate();
+
     List<SupportCase> findAllByOrderByOpenedAtDescIdDesc(Pageable pageable);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select supportCase
             from SupportCase supportCase

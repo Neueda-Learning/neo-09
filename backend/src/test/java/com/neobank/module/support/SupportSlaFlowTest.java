@@ -2,7 +2,13 @@ package com.neobank.module.support;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.BeforeEach;
@@ -123,6 +129,40 @@ class SupportSlaFlowTest {
         assertThat(stable.getPriority()).isEqualTo("P2");
         assertThat(caseEvents.countByCaseIdAndEventType(
                 stable.getCaseId(), "PRIORITY_ESCALATED")).isOne();
+    }
+
+    @Test
+    void concurrentSlaReadsStillWriteOneEscalationEventForTheLevel() throws Exception {
+        deliver(valid("corr-concurrent", "OTHER", "Concurrent sweep")); // priced P3, 72h SLA
+        SupportCase created = supportCases.findByCorrelationId("corr-concurrent").orElseThrow();
+        jdbc.update("update support_case set sla_deadline = ? where correlation_id = ?",
+                Instant.now().minus(Duration.ofHours(1)), "corr-concurrent");
+
+        int readers = 6;
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(readers);
+        List<Future<?>> requests = new ArrayList<>();
+        try {
+            for (int reader = 0; reader < readers; reader++) {
+                requests.add(pool.submit(() -> {
+                    start.await();
+                    mvc.perform(get("/api/v1/support/sla"))
+                            .andExpect(status().isOk());
+                    return null;
+                }));
+            }
+            start.countDown();
+            for (Future<?> request : requests) {
+                request.get();
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        SupportCase afterReads = supportCases.findByCaseId(created.getCaseId()).orElseThrow();
+        assertThat(afterReads.getPriority()).isEqualTo("P2");
+        assertThat(caseEvents.countByCaseIdAndEventType(
+                created.getCaseId(), "PRIORITY_ESCALATED")).isOne();
     }
 
     @Test
